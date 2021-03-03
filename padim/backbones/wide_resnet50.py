@@ -7,6 +7,7 @@ from torchvision.models import wide_resnet50_2
 
 class WideResNet50(Module):
     embeddings_size = 1792
+    num_patches = 32 * 32
 
     def __init__(self) -> None:
         super().__init__()

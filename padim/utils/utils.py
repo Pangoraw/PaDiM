@@ -5,10 +5,11 @@ The code from this file comes from:
     * https://github.com/taikiinoue45/PaDiM
 """
 import torch
+from torch import Tensor
 import torch.nn.functional as F
 
 
-def embeddings_concat(x0, x1):
+def embeddings_concat(x0: Tensor, x1: Tensor) -> Tensor:
     b0, c0, h0, w0 = x0.size()
     _, c1, h1, w1 = x1.size()
     s = h0 // h1
