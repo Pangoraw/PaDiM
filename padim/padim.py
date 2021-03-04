@@ -69,7 +69,7 @@ class PaDiM:
                         patch_embeddings[j, :], patch_embeddings[j, :]
                     )  # c * c
                 self.means[:, i] += patch_embeddings.sum(dim=0)  # c
-                self.N += b  # number of images
+            self.N += b  # number of images
 
     def train(self, dataloader) -> Tuple[Tensor, Tensor, Tensor]:
         """
@@ -103,6 +103,7 @@ class PaDiM:
         covs = self.covs.detach().clone()
 
         identity = torch.eye(self.num_embeddings).to(self.device)
+        means /= self.N
         for i in range(self.num_patches):
             covs[:, :, i] -= self.N * torch.outer(means[:, i], means[:, i])
             covs[:, :, i] /= self.N - 1  # corrected covariance
