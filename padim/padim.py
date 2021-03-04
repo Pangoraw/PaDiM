@@ -1,5 +1,6 @@
 from typing import Tuple, Union
 
+import numpy as np
 from numpy import ndarray as NDArray
 
 import torch
@@ -31,11 +32,12 @@ class PaDiM:
 
     def _init_backbone(self, backbone: str) -> None:
         if backbone == "resnet18":
-            self.model = ResNet18()
+            self.model = ResNet18().to(self.device)
         elif backbone == "wide_resnet50":
-            self.model = WideResNet50()
+            self.model = WideResNet50().to(self.device)
         else:
             raise Exception(f"unknown backbone {backbone}, choose one of ['resnet18', 'wide_resnet50']")    
+
         self.num_patches = self.model.num_patches
         self.max_embeddings_size = self.model.embeddings_size
 
@@ -118,10 +120,11 @@ class PaDiM:
     def predict(self, new_imgs: Tensor) -> Tensor:
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h)
+        embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
 
         distances = []
-        means, covs = self.get_params()
+        means, covs, _ = self.get_params()
+        means, covs = means.cpu().numpy(), covs.cpu().numpy()
         for i in range(h * w):
             mean = means[:, i]
             cvar_inv = np.linalg.inv(covs[:, :, i])

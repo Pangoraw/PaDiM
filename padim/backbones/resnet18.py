@@ -7,7 +7,7 @@ from torchvision.models import resnet18
 
 class ResNet18(Module):
     embeddings_size = 448
-    num_patches = 64 * 64
+    num_patches = 32 * 32
 
     def __init__(self) -> None:
         super().__init__()
