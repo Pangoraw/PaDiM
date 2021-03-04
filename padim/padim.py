@@ -1,19 +1,25 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 
 import numpy as np
 from numpy import ndarray as NDArray
 
 import torch
 from torch import Tensor, device as Device
+from torch.nn import Module
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 from scipy.spatial.distance import mahalanobis
 
 from padim.utils import embeddings_concat
 from padim.backbones import ResNet18, WideResNet50
 
+
 class PaDiM:
-    def __init__(self, num_embeddings: int=100, device: Union[str, Device]="cpu", backbone: str="resnet18"):
+    def __init__(
+        self,
+        num_embeddings: int = 100,
+        device: Union[str, Device] = "cpu",
+        backbone: str = "resnet18",
+    ):
         self.device = device
         self.num_embeddings = num_embeddings
 
@@ -36,7 +42,9 @@ class PaDiM:
         elif backbone == "wide_resnet50":
             self.model = WideResNet50().to(self.device)
         else:
-            raise Exception(f"unknown backbone {backbone}, choose one of ['resnet18', 'wide_resnet50']")    
+            raise Exception(
+                f"unknown backbone {backbone}, choose one of ['resnet18', 'wide_resnet50']"
+            )
 
         self.num_patches = self.model.num_patches
         self.max_embeddings_size = self.model.embeddings_size
@@ -71,7 +79,7 @@ class PaDiM:
                 self.means[:, i] += patch_embeddings.sum(dim=0)  # c
             self.N += b  # number of images
 
-    def train(self, dataloader) -> Tuple[Tensor, Tensor, Tensor]:
+    def train(self, dataloader: DataLoader) -> Tuple[Tensor, Tensor, Tensor]:
         """
         End-to-end training of the model
         Params
@@ -88,7 +96,7 @@ class PaDiM:
         means, covs, embedding_ids = self.get_params()
         return means, covs, embedding_ids
 
-    def get_params(self, epsilon: float=0.01) -> Tuple[Tensor, Tensor, Tensor]:
+    def get_params(self, epsilon: float = 0.01) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Computes the mean vectors and covariance matrices from the indermediary state
         Params
@@ -111,33 +119,59 @@ class PaDiM:
 
         return means, covs, self.embedding_ids
 
-    def test(self, dataloader):
+    def test(self, dataloader: DataLoader) -> List[NDArray]:
+        """
+        Consumes the given dataloader and outputs the corresponding distance matrices
+        Params
+        ======
+            dataloader: DataLoader - a dataloader of image tensors
+        Returns
+        =======
+            distances: ndarray - the (N * (w * h)) distance matrix
+        """
         distances = []
+        means, covs, _ = self.get_params()
+        means, covs = means.cpu().numpy(), covs.cpu().numpy()
         for new_imgs in dataloader:
-            new_distances = self.predict(new_imgs)
+            new_distances = self.predict(new_imgs, params=(means, covs))
             distances.extend(new_distances)
-        return distances
+        return np.array(distances)
 
-    def predict(self, new_imgs: Tensor) -> Tensor:
+    def predict(
+        self, new_imgs: Tensor, params: Tuple[NDArray, NDArray] = None
+    ) -> NDArray:
+        """
+        Computes the distance matrix for each image * patch
+        Params
+        ======
+            imgs: Tensor - (b * W * H) tensor of images
+            params: [(ndarray, ndarray)] - optional precomputed distribution parameters
+        Returns
+        =======
+            distances: ndarray - (c * b) array of distances
+        """
+        if params is None:
+            means, covs, _ = self.get_params()
+            means, covs = means.cpu().numpy(), covs.cpu().numpy()
+        else:
+            means, covs = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
         embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
 
         distances = []
-        means, covs, _ = self.get_params()
-        means, covs = means.cpu().numpy(), covs.cpu().numpy()
         for i in range(h * w):
             mean = means[:, i]
             cvar_inv = np.linalg.inv(covs[:, :, i])
             distance = [mahalanobis(e[:, i], mean, cvar_inv) for e in embeddings]
             distances.append(distance)
-        
-        return distances
+
+        return np.array(distances)
 
     def get_residuals(self) -> Tuple[int, Tensor, Tensor, Tensor]:
         """
         Get the intermediary data needed to stop the training and resume later
-        Returns 
+        Returns
         =======
             N: int - the number of images
             means: Tensor - the sums of embedding vectors
@@ -146,5 +180,6 @@ class PaDiM:
         """
         return self.N, self.means, self.covs, self.embedding_ids
 
-    def from_resisuals(N, means, covs, embedding_ids):
+    @staticmethod
+    def from_resisuals(N: int, means: NDArray, covs: NDArray, embedding_ids: NDArray):
         pass

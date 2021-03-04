@@ -8,6 +8,7 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 import torch
 from torch import Tensor
@@ -21,7 +22,7 @@ from padim.utils import mean_smoothing, compute_roc_score, compute_pro_score
 
 model = PaDiM(
     num_embeddings=120,
-    device="cuda",
+    device="cpu",
     backbone="resnet18",
 )
 
