@@ -5,7 +5,6 @@ from numpy import ndarray as NDArray
 
 import torch
 from torch import Tensor, device as Device
-from torch.nn import Module
 from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
@@ -14,6 +13,10 @@ from padim.backbones import ResNet18, WideResNet50
 
 
 class PaDiM:
+    """
+    The PaDiM model
+    """
+
     def __init__(
         self,
         num_embeddings: int = 100,
@@ -43,7 +46,8 @@ class PaDiM:
             self.model = WideResNet50().to(self.device)
         else:
             raise Exception(
-                f"unknown backbone {backbone}, choose one of ['resnet18', 'wide_resnet50']"
+                f"unknown backbone {backbone}, \
+                choose one of ['resnet18', 'wide_resnet50']"
             )
 
         self.num_patches = self.model.num_patches
@@ -54,7 +58,11 @@ class PaDiM:
             feature_1, feature_2, feature_3 = self.model(imgs.to(self.device))
         embeddings = embeddings_concat(feature_1, feature_2)
         embeddings = embeddings_concat(embeddings, feature_3)
-        embeddings = torch.index_select(embeddings, dim=1, index=self.embedding_ids)
+        embeddings = torch.index_select(
+            embeddings,
+            dim=1,
+            index=self.embedding_ids,
+        )
         return embeddings
 
     def train_one_batch(self, imgs: Tensor) -> None:
@@ -65,7 +73,8 @@ class PaDiM:
             imgs: Tensor - batch tensor of size (b * c * w * h)
         """
         with torch.no_grad():
-            embeddings = self._embed_batch(imgs.to(self.device))  # b * c * w * h
+            # b * c * w * h
+            embeddings = self._embed_batch(imgs.to(self.device))
             b = embeddings.size(0)
             embeddings = embeddings.reshape(
                 (-1, self.num_embeddings, self.num_patches)
@@ -96,9 +105,12 @@ class PaDiM:
         means, covs, embedding_ids = self.get_params()
         return means, covs, embedding_ids
 
-    def get_params(self, epsilon: float = 0.01) -> Tuple[Tensor, Tensor, Tensor]:
+    def get_params(
+        self, epsilon: float = 0.01
+    ) -> Tuple[Tensor, Tensor, Tensor]:
         """
-        Computes the mean vectors and covariance matrices from the indermediary state
+        Computes the mean vectors and covariance matrices from the
+        indermediary state
         Params
         ======
             epsilon: float - coefficient for the identity matrix
@@ -121,7 +133,8 @@ class PaDiM:
 
     def test(self, dataloader: DataLoader) -> List[NDArray]:
         """
-        Consumes the given dataloader and outputs the corresponding distance matrices
+        Consumes the given dataloader and outputs the corresponding
+        distance matrices
         Params
         ======
             dataloader: DataLoader - a dataloader of image tensors
@@ -145,7 +158,7 @@ class PaDiM:
         Params
         ======
             imgs: Tensor - (b * W * H) tensor of images
-            params: [(ndarray, ndarray)] - optional precomputed distribution parameters
+            params: [(ndarray, ndarray)] - optional precomputed parameters
         Returns
         =======
             distances: ndarray - (c * b) array of distances
@@ -163,7 +176,9 @@ class PaDiM:
         for i in range(h * w):
             mean = means[:, i]
             cvar_inv = np.linalg.inv(covs[:, :, i])
-            distance = [mahalanobis(e[:, i], mean, cvar_inv) for e in embeddings]
+            distance = [
+                mahalanobis(e[:, i], mean, cvar_inv) for e in embeddings
+            ]
             distances.append(distance)
 
         return np.array(distances)
@@ -176,10 +191,12 @@ class PaDiM:
             N: int - the number of images
             means: Tensor - the sums of embedding vectors
             covs: Tensor - the sums of the outer product of embedding vectors
-            embedding_ids: Tensor - the random dimensions used for size reduction
+            embedding_ids: Tensor - random dimensions used for size reduction
         """
         return self.N, self.means, self.covs, self.embedding_ids
 
     @staticmethod
-    def from_resisuals(N: int, means: NDArray, covs: NDArray, embedding_ids: NDArray):
+    def from_resisuals(
+        N: int, means: NDArray, covs: NDArray, embedding_ids: NDArray
+    ) -> None:
         pass
