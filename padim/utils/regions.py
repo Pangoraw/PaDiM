@@ -22,10 +22,10 @@ def propose_region(
     Params
     ======
         patches: ndarray - (h * w) patch activations
-        threshold: float
+        threshold: float - the activation threshold
     Returns
     =======
-        boxes
+        box - the bounding box
     """
     h, w = patches.shape
 
@@ -34,6 +34,7 @@ def propose_region(
 
     if patches[py, px] < threshold:
         return None
+    patches[py, px] = 0.0
 
     def explore_neighbors(x, y):
         directions = [
@@ -68,6 +69,32 @@ def propose_region(
     max_y = reduce(max, map(lambda p: p[1], neighbors), 0) + 1
 
     return (min_x, min_y, max_x, max_y)
+
+
+def propose_regions(patches, threshold: float = 0.75):
+    """Proposes many regions
+
+    >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
+    [(0, 0, 1, 2), (2, 0, 3, 2), (1, 2, 2, 3)]
+
+    >>> propose_regions(np.array([[0, 0], [0, 0]]))
+    []
+
+    Params
+    ======
+        patches: ndarray - (h * w) patch activations
+        threshold: float - the activation threshold
+    Returns
+    =======
+        boxes: List[Tuple[float, float, float, float]] - bounding boxes
+    """
+    regions = []
+    proposal = propose_region(patches, threshold)
+    while proposal is not None:
+        regions.append(proposal)
+        proposal = propose_region(patches, threshold)
+
+    return regions
 
 
 if __name__ == "__main__":
