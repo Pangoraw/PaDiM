@@ -4,7 +4,7 @@ from .utils import (
     compute_roc_score,
     compute_pro_score
 )
-from .regions import propose_region
+from .regions import propose_region, propose_regions
 
 __all__ = [
     "embeddings_concat",
@@ -12,4 +12,5 @@ __all__ = [
     "compute_roc_score",
     "compute_pro_score",
     "propose_region",
+    "propose_regions",
 ]
