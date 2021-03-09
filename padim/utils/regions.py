@@ -90,11 +90,7 @@ def propose_regions(patches, threshold: float = 0.75):
     """
     regions = []
     proposal = propose_region(patches, threshold)
-    i = 0
     while proposal is not None:
-        i += 1
-        if i >= 10:
-            break
         regions.append(proposal)
         proposal = propose_region(patches, threshold)
 
