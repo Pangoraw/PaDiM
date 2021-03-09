@@ -6,7 +6,7 @@ from os import path
 
 import numpy as np
 from PIL import Image
-import torch
+from torch import Tensor
 from torch.utils.data import Dataset
 
 
@@ -14,6 +14,7 @@ class LimitedDataset(Dataset):
     """
     Limits the underlying Dataset to only N samples
     """
+
     def __init__(self, dataset, limit=-1):
         """
         Params
@@ -24,7 +25,7 @@ class LimitedDataset(Dataset):
         super().__init__()
         self.dataset = dataset
 
-        if limit == -1: # limit of -1 is no limit
+        if limit == -1:  # limit of -1 is no limit
             limit = len(self.dataset)
         self.length = min(len(self.dataset), limit)
 
@@ -42,22 +43,28 @@ class SemmacapeTestDataset(Dataset):
     """
     Loads anomalous images from a folder of images and box txt files
     """
+
     def __init__(self, transforms, data_dir):
         super().__init__()
 
         self.data_dir = data_dir
         self.transforms = transforms
-        self.image_files = [f for f in os.listdir(data_dir) if f.endswith(".jpg")]
+        self.image_files = [
+            f for f in os.listdir(data_dir) if f.endswith(".jpg")
+        ]
 
     def __getitem__(self, index):
         img_location = path.join(self.data_dir, self.image_files[index])
-        
+
         img = Image.open(img_location)
         w, h = img.size
         img = self.transforms(img)
 
         with open(img_location.replace(".jpg", ".txt")) as f:
-            boxes = [[float(x) for x in l.split(" ")[1:-1]] for l in f.readlines()]
+            boxes = [
+                [float(x) for x in l.split(" ")[1:-1]]
+                for l in f.readlines()
+            ]
 
         _, w, h = img.shape
         mask = np.zeros((w, h))
@@ -76,15 +83,18 @@ class SemmacapeDataset(Dataset):
     """
     Loads normal images from a folder of images
     """
+
     def __init__(self, transforms, data_dir):
         super().__init__()
 
         self.data_dir = data_dir
         self.transforms = transforms
 
-        self.image_files = [f for f in os.listdir(data_dir) if f.endswith(".jpg")]
+        self.image_files = [
+            f for f in os.listdir(data_dir) if f.endswith(".jpg")
+        ]
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> Tensor:
         file_path = self.image_files[index]
         img = Image.open(path.join(self.data_dir, file_path))
         img = self.transforms(img)
