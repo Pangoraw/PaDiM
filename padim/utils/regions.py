@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 from functools import reduce
 
 import numpy as np
@@ -71,7 +71,7 @@ def propose_region(
     return (min_x, min_y, max_x, max_y)
 
 
-def propose_regions(patches, threshold: float = 0.75):
+def propose_regions(patches, threshold: float = 0.75, /, **kwargs):
     """Proposes many regions
 
     >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
@@ -94,7 +94,30 @@ def propose_regions(patches, threshold: float = 0.75):
         regions.append(proposal)
         proposal = propose_region(patches, threshold)
 
-    return regions
+    return filter_regions(regions, **kwargs)
+
+
+def filter_regions(regions, min_area: int = 1) -> List[Tuple[int, int, int, int]]:
+    """Filters out regions that are not relevant
+
+    >>> filter_regions([(0, 0, 1, 1)], min_area = 2)
+    []
+
+    >>> filter_regions([(0, 0, 1, 1), (0, 0, 2, 1)], min_area = 2)
+    [(0, 0, 2, 1)]
+
+    Params
+    ======
+        regions: List[Tuple[int, int, int, int]] - regions
+        min_area: int - the minimum area for a region
+    Returns
+    =======
+        regions: List[Tuple[int, int, int, int]] - regions
+    """
+    def get_area(region) -> int:
+        x1, y1, x2, y2 = region
+        return abs(x1 - x2) * abs(y1 - y2) 
+    return list(filter(lambda r: get_area(r) >= min_area, regions))
 
 
 if __name__ == "__main__":
