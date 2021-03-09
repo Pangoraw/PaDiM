@@ -71,7 +71,7 @@ def propose_region(
     return (min_x, min_y, max_x, max_y)
 
 
-def propose_regions(patches, threshold: float = 0.75, /, **kwargs):
+def propose_regions(patches, threshold: float = 0.75, **kwargs):
     """Proposes many regions
 
     >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
