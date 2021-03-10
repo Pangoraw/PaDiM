@@ -14,8 +14,8 @@ class WideResNet50(Module):
         self.wide_resnet50 = wide_resnet50_2(pretrained=True)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        """
-        Return the three intermediary layers from the WideResNet50 pre-trained model.
+        """Return the three intermediary layers from the WideResNet50
+        pre-trained model.
         Params
         ======
             x: Tensor - the input tensor of size (b * c * w * h)

@@ -1,14 +1,19 @@
 from typing import Tuple, Union, List
 from functools import reduce
+from itertools import product
 
 import numpy as np
 from numpy import ndarray as NDArray
 
 
+# A box defined as (x1, y1, x2, y2)
+Region = Tuple[int, int, int, int]
+
+
 def propose_region(
     patches: NDArray,
     threshold: float = 0.75
-) -> Union[None, Tuple[float, float, float, float]]:
+) -> Union[None, Region]:
     """Proposes regions from a set of patch activations
 
     >>> propose_region(np.array([[1, 1, 0], [0, 1, 0], [0, 0, 0]]))
@@ -71,7 +76,11 @@ def propose_region(
     return (min_x, min_y, max_x, max_y)
 
 
-def propose_regions(patches, threshold: float = 0.75, **kwargs):
+def propose_regions(
+    patches: NDArray,
+    threshold: float = 0.75,
+    **kwargs
+) -> List[Region]:
     """Proposes many regions
 
     >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
@@ -97,7 +106,7 @@ def propose_regions(patches, threshold: float = 0.75, **kwargs):
     return filter_regions(regions, **kwargs)
 
 
-def filter_regions(regions, min_area: int = 1) -> List[Tuple[int, int, int, int]]:
+def filter_regions(regions: List[Region], min_area: int = 1) -> List[Region]:
     """Filters out regions that are not relevant
 
     >>> filter_regions([(0, 0, 1, 1)], min_area = 2)
@@ -116,8 +125,50 @@ def filter_regions(regions, min_area: int = 1) -> List[Tuple[int, int, int, int]
     """
     def get_area(region) -> int:
         x1, y1, x2, y2 = region
-        return abs(x1 - x2) * abs(y1 - y2) 
+        return abs(x1 - x2) * abs(y1 - y2)
     return list(filter(lambda r: get_area(r) >= min_area, regions))
+
+
+def _serialize_region(
+    region: Region
+) -> List[Tuple[int, int]]:
+    """Lists the patches that are part of a region
+
+    >>> _serialize_region((0, 0, 1, 2))
+    [(0, 0), (0, 1)]
+
+    Params
+    ======
+        region - Region the region to serialize
+    Returns
+    =======
+        patches - List[Tuple[int, int]] patches part of the region
+    """
+    x1, y1, x2, y2 = region
+    return list(product(range(x1, x2), range(y1, y2)))
+
+
+def IoU(r1: Region, r2: Region) -> float:
+    """Intersection over Union
+
+    >>> IoU((0, 0, 1, 2), (0, 0, 1, 1))
+    0.5
+
+    Params
+    ======
+        r1 - Region
+        r2 - Region
+    Returns
+    =======
+        IoU - the insersection over union
+    """
+    s1 = _serialize_region(r1)
+    s2 = _serialize_region(r2)
+
+    intersection = set(s1).intersection(s2)
+    union = set(s1).union(s2)
+
+    return len(intersection) / len(union)
 
 
 if __name__ == "__main__":

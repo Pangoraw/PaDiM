@@ -46,8 +46,8 @@ class PaDiM:
             self.model = WideResNet50().to(self.device)
         else:
             raise Exception(
-                f"unknown backbone {backbone}, \
-                choose one of ['resnet18', 'wide_resnet50']"
+                f"unknown backbone {backbone}, "
+                "choose one of ['resnet18', 'wide_resnet50']"
             )
 
         self.num_patches = self.model.num_patches
@@ -194,10 +194,33 @@ class PaDiM:
             covs: Tensor - the sums of the outer product of embedding vectors
             embedding_ids: Tensor - random dimensions used for size reduction
         """
-        return self.N, self.means, self.covs, self.embedding_ids
+        if isinstance(self.model, ResNet18):
+            backbone = "resnet18"
+        elif isinstance(self.model, WideResNet50):
+            backbone = "wide_resnet50"
+        else:
+            raise NotImplementedError()
+
+        return self.N, self.means, self.covs, self.embedding_ids, backbone
 
     @staticmethod
-    def from_resisuals(
-        N: int, means: NDArray, covs: NDArray, embedding_ids: NDArray
-    ) -> None:
-        pass
+    def from_residuals(
+        N: int,
+        means: NDArray,
+        covs: NDArray,
+        embedding_ids: NDArray,
+        backbone: str,
+        device: Union[Device, str]
+    ):
+        num_embeddings, = embedding_ids.shape
+        padim = PaDiM(
+            num_embeddings=num_embeddings,
+            device=device,
+            backbone=backbone
+        )
+        padim.embedding_ids = torch.tensor(embedding_ids).to(device)
+        padim.N = N
+        padim.means = torch.tensor(means).to(device)
+        padim.covs = torch.tensor(covs).to(device)
+
+        return padim

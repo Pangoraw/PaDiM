@@ -14,8 +14,8 @@ class ResNet18(Module):
         self.resnet18 = resnet18(pretrained=True)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
-        """
-        Return the three intermediary layers from the ResNet18 pre-trained model.
+        """Return the three intermediary layers from the ResNet18
+        pre-trained model.
         Params
         ======
             x: Tensor - the input tensor of size (b * c * w * h)
