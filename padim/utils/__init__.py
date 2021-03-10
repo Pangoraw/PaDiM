@@ -8,6 +8,7 @@ from .regions import (
     propose_region,
     propose_regions,
     IoU,
+    floating_IoU,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "propose_region",
     "propose_regions",
     "IoU",
+    "floating_IoU",
 ]

@@ -171,6 +171,46 @@ def IoU(r1: Region, r2: Region) -> float:
     return len(intersection) / len(union)
 
 
+def floating_IoU(
+        r1: Tuple[float, float, float, float],
+        r2: Tuple[float, float, float, float]
+) -> float:
+    """IoU for non-grid based boxes
+
+    >>> floating_IoU((0, 0, 1, 1), (0, 0, 1, 2))
+    0.5
+
+    Params
+    ======
+        r1 - (x, y, w, h)
+        r2 - (x, y, w, h)
+    Returns
+    =======
+        IoU - the insersection over union
+    """
+    x1, y1, w1, h1 = r1
+    x2, y2, w2, h2 = r2
+
+    left = max(x1, x2)
+    right = min(x1 + w1, x2 + w2)
+    top = max(y1, y2)
+    bottom = min(y1 + h1, y2 + h2)
+
+    overlap_height = bottom - top
+    overlap_width = right - left
+
+    if overlap_height <= 0 or overlap_width <= 0:
+        overlap_area = 0
+    else:
+        overlap_area = overlap_height * overlap_width
+
+    area1 = w1 * h1
+    area2 = w2 * h2
+
+    union_area = area1 + area2 - overlap_area
+    return overlap_area / union_area
+
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
