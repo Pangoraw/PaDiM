@@ -57,7 +57,11 @@ IOU_THRESHOLD = cfg.iou_threshold
 padim = PaDiM(device="cuda:0", backbone="wide_resnet50")
 img_transforms = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Resize((128, 128)),
+    transforms.Resize((256, 256)),
+    transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    ),
 ])
 dataloader = DataLoader(
     batch_size=32,
