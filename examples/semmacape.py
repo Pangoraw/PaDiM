@@ -1,10 +1,13 @@
 import argparse
+import sys
 
 from tqdm import tqdm
 import pandas as pd
 from PIL import Image
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
+
+sys.path.append('./')
 
 from padim import PaDiM
 from padim.datasets import (
@@ -61,7 +64,7 @@ dataloader = DataLoader(
     num_workers=2,
     dataset=LimitedDataset(limit=LIMIT, dataset=TrainingDataset(
         data_dir="/share/home/berg/scripts/416_empty/",
-        transforms=img_transforms,
+        img_transforms=img_transforms,
     )),
 )
 
@@ -95,9 +98,9 @@ for loc, img, mask in tqdm(test_dataloader):
     n_proposals += len(preds)
 
     # 2. Collect GT boxes
-    PATH = '/share/projects/semmacape/Data_Semmacape_2/416_non_empty/'
+    # PATH = '/share/projects/semmacape/Data_Semmacape_2/416_non_empty/'
     with open(
-        loc[0].replace(PATH, '').replace('.jpg', '_with_name_label.txt'),
+        loc[0].replace('.jpg', '_with_name_label.txt'),
         'r'
     ) as f:
         lines = f.readlines()
