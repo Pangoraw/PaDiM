@@ -146,10 +146,18 @@ class PaDiM:
         distances = []
         means, covs, _ = self.get_params()
         means, covs = means.cpu().numpy(), covs.cpu().numpy()
+        inv_cvars = self._get_inv_cvars(covs)
         for new_imgs in dataloader:
-            new_distances = self.predict(new_imgs, params=(means, covs))
+            new_distances = self.predict(new_imgs, params=(means, inv_cvars))
             distances.extend(new_distances)
         return np.array(distances)
+
+    def _get_inv_cvars(covs: NDArray) -> NDArray:
+        c, _, n = covs.shape
+        inv_cvars = np.zeros_like(covs)
+        for i in range(n):
+            inv_cvars[:, :, i] = np.linalg.inv(covs[:, :, i])
+        return inv_cvars
 
     def predict(
         self, new_imgs: Tensor, params: Tuple[NDArray, NDArray] = None
@@ -167,8 +175,9 @@ class PaDiM:
         if params is None:
             means, covs, _ = self.get_params()
             means, covs = means.cpu().numpy(), covs.cpu().numpy()
+            inv_cvars = self._get_inv_cvars(covs)
         else:
-            means, covs = params
+            means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
         embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
@@ -176,7 +185,7 @@ class PaDiM:
         distances = []
         for i in range(h * w):
             mean = means[:, i]
-            cvar_inv = np.linalg.inv(covs[:, :, i])
+            cvar_inv = inv_cvars[:, :, i]
             distance = [
                 mahalanobis(e[:, i], mean, cvar_inv) for e in embeddings
             ]

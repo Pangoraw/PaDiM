@@ -3,9 +3,8 @@ import sys
 import pickle
 
 from tqdm import tqdm
-from PIL import Image
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 sys.path.append('./')
 
@@ -24,6 +23,7 @@ def get_args():
     parser.add_argument("--iou_threshold", type=float, default=0.5)
     parser.add_argument("--params_path", type=str)
     return parser.parse_args()
+
 
 cfg = get_args()
 LIMIT = cfg.test_limit
@@ -62,9 +62,10 @@ positive_proposals = 0
 
 means, covs, _ = padim.get_params()
 means, covs = means.cpu().numpy(), covs.cpu().numpy()
+inv_cvars = padim._get_inv_cvars(covs)
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
-    res = padim.predict(img, params=(means, covs))
+    res = padim.predict(img, params=(means, inv_cvars))
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE))
 
@@ -72,8 +73,8 @@ for loc, img, mask in tqdm(test_dataloader):
         x1, y1, x2, y2 = box
         return (
             x1 / LATTICE,
-            y1 / LATTICE, 
-            abs(x1 - x2) / LATTICE, 
+            y1 / LATTICE,
+            abs(x1 - x2) / LATTICE,
             abs(y1 - y2) / LATTICE
         )
     preds = propose_regions(res, threshold=THRESHOLD)
