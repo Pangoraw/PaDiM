@@ -11,11 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 sys.path.append('./')
 
 from padim import PaDiM
-from padim.datasets import (
-    LimitedDataset,
-    SemmacapeTestDataset,
-)
-from padim.utils import propose_regions, floating_IoU
+from padim.datasets import LimitedDataset
 
 
 class TrainingDataset(Dataset):
@@ -80,4 +76,3 @@ params = padim.get_residuals()
 with open(PARAMS_PATH, 'wb') as f:
     pickle.dump(params, f)
 print(f">> Params saved at {PARAMS_PATH}")
-

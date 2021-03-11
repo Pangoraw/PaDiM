@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from typing_extensions import Literal
 from typing import Union, List, Tuple
@@ -15,6 +16,8 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import Compose, ToTensor, Resize
+
+sys.path.append("./")
 
 from padim import PaDiM
 from padim.utils import mean_smoothing, compute_roc_score, compute_pro_score

@@ -57,6 +57,7 @@ test_dataloader = DataLoader(
 classes = {}
 
 n_proposals = 0
+n_included = 0
 positive_proposals = 0
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
@@ -101,9 +102,17 @@ for loc, img, mask in tqdm(test_dataloader):
                 positive_proposals += 1
                 classes[cls] = (classes[cls][0] + 1, classes[cls][1])
                 break  # Dont count GT box more than once
+            x2, y2, w2, h2 = pred
+            # check inclusion
+            if (x2 >= x1
+                    and x2 + w2 <= x1 + w
+                    and y2 >= y1
+                    and y2 + h2 <= y1 + h):
+                n_included += 1
 
 print(f"positive proposals: {positive_proposals}")
 print(f"total proposals: {n_proposals}")
+print(f"included: {n_included}")
 print(f"PPR: {positive_proposals / n_proposals}")
 for cls, (detected, n_gt) in classes.items():
     print(f">> {cls}: recall: {detected / n_gt}")

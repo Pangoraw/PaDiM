@@ -184,7 +184,7 @@ class PaDiM:
 
         return np.array(distances)
 
-    def get_residuals(self) -> Tuple[int, Tensor, Tensor, Tensor]:
+    def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:
         """
         Get the intermediary data needed to stop the training and resume later
         Returns
@@ -201,7 +201,16 @@ class PaDiM:
         else:
             raise NotImplementedError()
 
-        return self.N, self.means, self.covs, self.embedding_ids, backbone
+        def detach_numpy(t: Tensor) -> NDArray:
+            return t.detach().cpu().numpy()
+
+        return (
+            self.N,
+            detach_numpy(self.means),
+            detach_numpy(self.covs),
+            detach_numpy(self.embedding_ids),
+            backbone
+        )
 
     @staticmethod
     def from_residuals(
