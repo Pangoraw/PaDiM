@@ -59,9 +59,12 @@ classes = {}
 n_proposals = 0
 n_included = 0
 positive_proposals = 0
+
+means, covs, _ = padim.get_params()
+means, covs = means.cpu().numpy(), covs.cpu().numpy()
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
-    res = padim.predict(img)
+    res = padim.predict(img, params=(means, covs))
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE))
 
