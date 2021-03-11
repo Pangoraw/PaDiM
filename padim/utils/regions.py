@@ -95,7 +95,7 @@ def propose_regions(
         threshold: float - the activation threshold
     Returns
     =======
-        boxes: List[Tuple[float, float, float, float]] - bounding boxes
+        boxes: List[Region] - (x1, y1, x2, y2) bounding boxes
     """
     regions = []
     proposal = propose_region(patches, threshold)
