@@ -83,6 +83,8 @@ for loc, img, mask in tqdm(test_dataloader):
     preds = [normalize_box(box) for box in preds]  # map from 0,LATTICE to 0,1
     n_proposals += len(preds)
 
+    img_proposals_counted = False
+
     # 2. Collect GT boxes
     # PATH = '/share/projects/semmacape/Data_Semmacape_2/416_non_empty/'
     with open(
@@ -94,10 +96,17 @@ for loc, img, mask in tqdm(test_dataloader):
     for line in lines:
         cls, cx, cy, bw, bh, _ = line.split(' ')
         if cls not in classes:
-            # classes[cls] = (detected, total number of GT)
-            classes[cls] = (0, 1)
+            # classes[cls] = (# detected, # proposals, total number of GT)
+            classes[cls] = (0, len(preds), 1)
+            # Hypothesis: only one class per image
+            img_proposals_counted = True
         else:
-            classes[cls] = (classes[cls][0], classes[cls][1] + 1)
+            n_proposals_offset = 0 if img_proposals_counted else len(preds)
+            classes[cls] = (
+                classes[cls][0],
+                classes[cls][1] + n_proposals_offset,
+                classes[cls][2] + 1
+            )
         x1, y1 = float(cx) - float(bw) / 2, float(cy) - float(bh) / 2
         w, h = float(bw), float(bh)
         box = (x1, y1, w, h)
@@ -106,7 +115,11 @@ for loc, img, mask in tqdm(test_dataloader):
             iou = floating_IoU(box, pred)
             if iou >= IOU_THRESHOLD:
                 positive_proposals += 1
-                classes[cls] = (classes[cls][0] + 1, classes[cls][1])
+                classes[cls] = (
+                    classes[cls][0] + 1,
+                    classes[cls][1],
+                    classes[cls][2]
+                )
                 break  # Dont count GT box more than once
             x2, y2, w2, h2 = pred
             # check inclusion
@@ -120,5 +133,6 @@ print(f"positive proposals: {positive_proposals}")
 print(f"total proposals: {n_proposals}")
 print(f"included: {n_included}")
 print(f"PPR: {positive_proposals / n_proposals}")
-for cls, (detected, n_gt) in classes.items():
+for cls, (detected, n_cls_proposals, n_gt) in classes.items():
     print(f">> {cls}: recall: {detected / n_gt}")
+    print(f">> {cls}: precision: {detected / n_cls_proposals}")

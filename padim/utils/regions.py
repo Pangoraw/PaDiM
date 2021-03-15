@@ -12,7 +12,8 @@ Region = Tuple[int, int, int, int]
 
 def propose_region(
     patches: NDArray,
-    threshold: float = 0.75
+    threshold: float = 0.75,
+    explore_diagonals: bool = False,
 ) -> Union[None, Region]:
     """Proposes regions from a set of patch activations
 
@@ -21,6 +22,9 @@ def propose_region(
 
     >>> propose_region(np.array([[1, 0], [0, 0]]))
     (0, 0, 1, 1)
+
+    >>> propose_region(np.array([[1, 0], [0, 1]]), explore_diagonals=True)
+    (0, 0, 2, 2)
 
     >>> propose_region(np.array([[.1, 0], [0, 0]]), threshold=0.2)
 
@@ -41,13 +45,21 @@ def propose_region(
         return None
     patches[py, px] = 0.0
 
+    directions = [
+        (0,  1),  # right
+        (0, -1),  # left
+        (1,  0),  # down
+        (-1, 0),  # up
+    ]
+    if explore_diagonals:
+        directions.extend([
+            (-1, -1),  # upper left
+            (-1, 1),  # bottom left
+            (1, -1),  # upper right
+            (1, 1),  # bottom right
+        ])
+
     def explore_neighbors(x, y):
-        directions = [
-            (0,  1),  # right
-            (0, -1),  # left
-            (1,  0),  # down
-            (-1, 0),  # up
-        ]
         neighbors = []
         for dx, dy in directions:
             nx, ny = dx + x, dy + y
