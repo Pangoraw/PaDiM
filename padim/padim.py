@@ -152,7 +152,7 @@ class PaDiM:
             distances.extend(new_distances)
         return np.array(distances)
 
-    def _get_inv_cvars(covs: NDArray) -> NDArray:
+    def _get_inv_cvars(self, covs: NDArray) -> NDArray:
         c, _, n = covs.shape
         inv_cvars = np.zeros_like(covs)
         for i in range(n):

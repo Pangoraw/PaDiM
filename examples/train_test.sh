@@ -10,6 +10,10 @@ set -o allexport
 source $CONFIG_FILE
 set +o allexport
 
+echo ">> Config: "
+cat $CONFIG_FILE | tee -a $LOG_FILE
+echo "THRESHOLD=$THRESHOLD" | tee -a $LOG_FILE
+
 if [ -f "$PARAMS_PATH" ]; then
   echo ">> $PARAMS_PATH already exists, skipping training"
 else
@@ -22,4 +26,5 @@ python examples/test_semmacape.py \
   --threshold $THRESHOLD \
   --iou_threshold $IOU_THRESHOLD \
   --params_path $PARAMS_PATH \
+  --min_area $MIN_AREA \
   | tee -a $LOG_FILE
