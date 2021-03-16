@@ -60,6 +60,8 @@ classes = {}
 
 n_proposals = 0
 n_included = 0
+n_gt = 0
+sum_iou = 0
 positive_proposals = 0
 
 means, covs, _ = padim.get_params()
@@ -94,6 +96,7 @@ for loc, img, mask in tqdm(test_dataloader):
         lines = f.readlines()
     boxes = []
     for line in lines:
+        n_gt += 1
         cls, cx, cy, bw, bh, _ = line.split(' ')
         if cls not in classes:
             # classes[cls] = (# detected, # proposals, total number of GT)
@@ -111,16 +114,20 @@ for loc, img, mask in tqdm(test_dataloader):
         w, h = float(bw), float(bh)
         box = (x1, y1, w, h)
 
+        box_detected = False
         for pred in preds:
             iou = floating_IoU(box, pred)
-            if iou >= IOU_THRESHOLD:
+            sum_iou += iou
+            if not box_detected and iou >= IOU_THRESHOLD:
+                # Positive detection
+                # Count detected box only once
                 positive_proposals += 1
                 classes[cls] = (
                     classes[cls][0] + 1,
                     classes[cls][1],
                     classes[cls][2]
                 )
-                break  # Dont count GT box more than once
+                box_detected = True
             x2, y2, w2, h2 = pred
             # check inclusion
             if (x2 >= x1
@@ -133,6 +140,8 @@ print(f"positive proposals: {positive_proposals}")
 print(f"total proposals: {n_proposals}")
 print(f"included: {n_included}")
 print(f"PPR: {positive_proposals / n_proposals}")
-for cls, (detected, n_cls_proposals, n_gt) in classes.items():
-    print(f">> {cls}: recall: {detected / n_gt}")
+print(f"RECALL: {positive_proposals / n_gt}")
+print(f"MEAN_IOU: {sum_iou / n_proposals}")
+for cls, (detected, n_cls_proposals, n_cls_gt) in classes.items():
+    print(f">> {cls}: recall: {detected / n_cls_gt}")
     print(f">> {cls}: precision: {detected / n_cls_proposals}")
