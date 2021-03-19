@@ -88,7 +88,6 @@ for loc, img, mask in tqdm(test_dataloader):
     img_proposals_counted = False
 
     # 2. Collect GT boxes
-    # PATH = '/share/projects/semmacape/Data_Semmacape_2/416_non_empty/'
     with open(
         loc[0].replace('.jpg', '_with_name_label.txt'),
         'r'
@@ -99,8 +98,9 @@ for loc, img, mask in tqdm(test_dataloader):
         n_gt += 1
         cls, cx, cy, bw, bh, _ = line.split(' ')
         if cls not in classes:
-            # classes[cls] = (# detected, # proposals, total number of GT)
-            classes[cls] = (0, len(preds), 1)
+            # classes[cls] =
+            # (# detected, # proposals, sum(iou), total number of GT)
+            classes[cls] = (0, len(preds), 0, 1)
             # Hypothesis: only one class per image
             img_proposals_counted = True
         else:
@@ -108,7 +108,8 @@ for loc, img, mask in tqdm(test_dataloader):
             classes[cls] = (
                 classes[cls][0],
                 classes[cls][1] + n_proposals_offset,
-                classes[cls][2] + 1
+                classes[cls][2],
+                classes[cls][3] + 1
             )
         x1, y1 = float(cx) - float(bw) / 2, float(cy) - float(bh) / 2
         w, h = float(bw), float(bh)
@@ -118,6 +119,12 @@ for loc, img, mask in tqdm(test_dataloader):
         for pred in preds:
             iou = floating_IoU(box, pred)
             sum_iou += iou
+            classes[cls] = (
+                classes[cls][0],
+                classes[cls][1],
+                classes[cls][2] + iou,
+                classes[cls][3],
+            )
             if not box_detected and iou >= IOU_THRESHOLD:
                 # Positive detection
                 # Count detected box only once
@@ -125,7 +132,8 @@ for loc, img, mask in tqdm(test_dataloader):
                 classes[cls] = (
                     classes[cls][0] + 1,
                     classes[cls][1],
-                    classes[cls][2]
+                    classes[cls][2],
+                    classes[cls][3]
                 )
                 box_detected = True
             x2, y2, w2, h2 = pred
@@ -142,6 +150,7 @@ print(f"included: {n_included}")
 print(f"PPR: {positive_proposals / n_proposals}")
 print(f"RECALL: {positive_proposals / n_gt}")
 print(f"MEAN_IOU: {sum_iou / n_proposals}")
-for cls, (detected, n_cls_proposals, n_cls_gt) in classes.items():
+for cls, (detected, n_cls_proposals, cls_sum_iou, n_cls_gt) in classes.items():
     print(f">> {cls}: recall: {detected / n_cls_gt}")
     print(f">> {cls}: precision: {detected / n_cls_proposals}")
+    print(f">> {cls}: mean_iou: {cls_sum_iou / n_cls_proposals}")
