@@ -248,15 +248,11 @@ def non_maximum_suppression(
     while len(boxes) > 0:
         box = boxes.pop()
         new_boxes.append(box)
-        idx_to_delete = []
-        for i, other_box in enumerate(boxes):
-            iou = floating_IoU(box, other_box)
-            # filter boxes
-            if iou < iou_threshold:
-                idx_to_delete.append(i)
         # remove boxes
-        for i in idx_to_delete:
-            boxes.pop(i)
+        boxes = list(filter(
+            lambda other_box: floating_IoU(box, other_box) >= iou_threshold,
+            boxes
+        ))
 
     return new_boxes
 
