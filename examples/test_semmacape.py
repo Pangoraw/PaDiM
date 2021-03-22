@@ -18,11 +18,12 @@ from padim.utils import propose_regions, floating_IoU
 
 def get_args():
     parser = argparse.ArgumentParser(prog="PaDiM tester")
+    parser.add_argument("--params_path", required=True, type=str)
     parser.add_argument("--test_limit", type=int, default=-1)
     parser.add_argument("--threshold", type=float, default=0.8)
     parser.add_argument("--iou_threshold", type=float, default=0.5)
     parser.add_argument("--min_area", type=int, default=2)
-    parser.add_argument("--params_path", type=str)
+    parser.add_argument("--use_nms", action="store_true")
     return parser.parse_args()
 
 
@@ -32,6 +33,8 @@ THRESHOLD = cfg.threshold
 IOU_THRESHOLD = cfg.iou_threshold
 PARAMS_PATH = cfg.params_path
 MIN_AREA = cfg.min_area
+USE_NMS = cfg.use_nms
+print(USE_NMS)
 LATTICE = 104
 
 with open(PARAMS_PATH, 'rb') as f:
@@ -82,7 +85,12 @@ for loc, img, mask in tqdm(test_dataloader):
             abs(x1 - x2) / LATTICE,
             abs(y1 - y2) / LATTICE
         )
-    preds = propose_regions(res, threshold=THRESHOLD, min_area=MIN_AREA)
+    preds = propose_regions(
+        res,
+        threshold=THRESHOLD,
+        min_area=MIN_AREA,
+        use_nms=USE_NMS,
+    )
     preds = [normalize_box(box) for box in preds]  # map from 0,LATTICE to 0,1
     n_proposals += len(preds)
 

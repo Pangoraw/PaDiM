@@ -18,13 +18,13 @@ def propose_region(
     """Proposes regions from a set of patch activations
 
     >>> propose_region(np.array([[1, 1, 0], [0, 1, 0], [0, 0, 0]]))
-    (0, 0, 2, 2)
+    (0, 0, 2, 2, 1)
 
     >>> propose_region(np.array([[1, 0], [0, 0]]))
-    (0, 0, 1, 1)
+    (0, 0, 1, 1, 1)
 
     >>> propose_region(np.array([[1, 0], [0, 1]]), explore_diagonals=True)
-    (0, 0, 2, 2)
+    (0, 0, 2, 2, 1)
 
     >>> propose_region(np.array([[.1, 0], [0, 0]]), threshold=0.2)
 
@@ -40,8 +40,9 @@ def propose_region(
 
     first_patch_idx = np.argmax(patches, axis=None)
     px, py = first_patch_idx % w, first_patch_idx // w
+    patch_value = patches[py, px]
 
-    if patches[py, px] < threshold:
+    if patch_value < threshold:
         return None
     patches[py, px] = 0.0
 
@@ -85,7 +86,7 @@ def propose_region(
     max_x = reduce(max, map(lambda p: p[0], neighbors), 0) + 1
     max_y = reduce(max, map(lambda p: p[1], neighbors), 0) + 1
 
-    return (min_x, min_y, max_x, max_y)
+    return (min_x, min_y, max_x, max_y, patch_value)
 
 
 def propose_regions(
@@ -96,7 +97,7 @@ def propose_regions(
     """Proposes many regions
 
     >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
-    [(0, 0, 1, 2), (2, 0, 3, 2), (1, 2, 2, 3)]
+    [(0, 0, 1, 2, 1), (2, 0, 3, 2, 1), (1, 2, 2, 3, 1)]
 
     >>> propose_regions(np.array([[0, 0], [0, 0]]))
     []
@@ -118,7 +119,12 @@ def propose_regions(
     return filter_regions(regions, **kwargs)
 
 
-def filter_regions(regions: List[Region], min_area: int = 1) -> List[Region]:
+def filter_regions(
+    regions: List[Region],
+    min_area: int = 1,
+    use_nms: bool = False,
+    **kwargs,
+) -> List[Region]:
     """Filters out regions that are not relevant
 
     >>> filter_regions([(0, 0, 1, 1)], min_area = 2)
@@ -129,15 +135,17 @@ def filter_regions(regions: List[Region], min_area: int = 1) -> List[Region]:
 
     Params
     ======
-        regions: List[Tuple[int, int, int, int]] - regions
+        regions: List[Tuple[float, float, float, float]] - regions
         min_area: int - the minimum area for a region
     Returns
     =======
-        regions: List[Tuple[int, int, int, int]] - regions
+        regions: List[Tuple[float, float, float, float]] - regions
     """
-    def get_area(region) -> int:
-        x1, y1, x2, y2 = region
+    def get_area(region) -> float:
+        x1, y1, x2, y2 = region[:4]
         return abs(x1 - x2) * abs(y1 - y2)
+    if use_nms:
+        regions = non_maximum_suppression(regions, **kwargs)
     return list(filter(lambda r: get_area(r) >= min_area, regions))
 
 
@@ -194,14 +202,14 @@ def floating_IoU(
 
     Params
     ======
-        r1 - (x, y, w, h)
-        r2 - (x, y, w, h)
+        r1 - (x, y, w, h,...)
+        r2 - (x, y, w, h,...)
     Returns
     =======
         IoU - the insersection over union
     """
-    x1, y1, w1, h1 = r1
-    x2, y2, w2, h2 = r2
+    x1, y1, w1, h1 = r1[:4]
+    x2, y2, w2, h2 = r2[:4]
 
     left = max(x1, x2)
     right = min(x1 + w1, x2 + w2)
@@ -221,6 +229,36 @@ def floating_IoU(
 
     union_area = area1 + area2 - overlap_area
     return overlap_area / union_area
+
+
+def non_maximum_suppression(
+    boxes: List,
+    iou_threshold: float = 0.5
+) -> List[Region]:
+    """Filter boxes using non-maximum suppression
+
+    >>> non_maximum_suppression([(0, 0, 1, 2, .2), (0, 0, 1, 0, .4)])
+    [(0, 0, 1, 0, 0.4)]
+
+    """
+    # TODO: Fast version using numpy
+    # Sort boxes by confidence scores
+    boxes = sorted(boxes, key=lambda b: b[4])
+    new_boxes = []
+    while len(boxes) > 0:
+        box = boxes.pop()
+        new_boxes.append(box)
+        idx_to_delete = []
+        for i, other_box in enumerate(boxes):
+            iou = floating_IoU(box, other_box)
+            # filter boxes
+            if iou < iou_threshold:
+                idx_to_delete.append(i)
+        # remove boxes
+        for i in idx_to_delete:
+            boxes.pop(i)
+
+    return new_boxes
 
 
 if __name__ == "__main__":
