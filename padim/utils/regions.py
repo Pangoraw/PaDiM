@@ -250,7 +250,7 @@ def non_maximum_suppression(
         new_boxes.append(box)
         # remove boxes
         boxes = list(filter(
-            lambda other_box: floating_IoU(box, other_box) >= iou_threshold,
+            lambda other_box: floating_IoU(box, other_box) < iou_threshold,
             boxes
         ))
 
