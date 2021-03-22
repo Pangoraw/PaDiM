@@ -231,15 +231,27 @@ def floating_IoU(
     return overlap_area / union_area
 
 
+def cvt_xyxys_xywhs(box):
+    x1, y1, x2, y2, s = box
+    return (x1, y1, x2 - x1, y2 - y1, s)
+
+
 def non_maximum_suppression(
     boxes: List,
     iou_threshold: float = 0.5
-) -> List[Region]:
+) -> List:
     """Filter boxes using non-maximum suppression
 
-    >>> non_maximum_suppression([(0, 0, 1, 2, .2), (0, 0, 1, 0, .4)])
-    [(0, 0, 1, 0, 0.4)]
+    >>> non_maximum_suppression([(0, 0, 1, 2, .2), (0, 0, 1, 1, .4)])
+    [(0, 0, 1, 1, 0.4)]
 
+    Params
+    ======
+        boxes: List[Regions] - regions with score
+        iou_threshold: float - the threshold at which to remove boxes
+    Returns
+    =======
+        boxes - List[Regions] - the filtered regions
     """
     # TODO: Fast version using numpy
     # Sort boxes by confidence scores
@@ -250,7 +262,9 @@ def non_maximum_suppression(
         new_boxes.append(box)
         # remove boxes
         boxes = list(filter(
-            lambda other_box: floating_IoU(box, other_box) < iou_threshold,
+            lambda other_box: floating_IoU(
+                cvt_xyxys_xywhs(box),
+                cvt_xyxys_xywhs(other_box)) < iou_threshold,
             boxes
         ))
 
