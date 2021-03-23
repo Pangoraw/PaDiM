@@ -84,6 +84,8 @@ class PaDiMSVDD(PaDiMBase):
         loss_writer = SummaryWriter("tboard/losses")
         if test_images is not None:
             image_writer = SummaryWriter("tboard/images")
+            image_grid = visionutils.make_grid(test_images)
+            image_writer.add_image("Images/Reals", image_grid)
 
             def make_test(global_step):
                 anomalies = self.predict(test_images)
@@ -109,6 +111,7 @@ class PaDiMSVDD(PaDiMBase):
             logger.info('Initializing center c...')
             self.c = self._init_center_c(dataloader)
             logger.info('Center c initialized.')
+            logger.info('C is at %f' % torch.sum(self.c**2).item())
 
         self.svdd.net.train()
         for epoch in tqdm(range(n_epochs)):

@@ -11,6 +11,7 @@ sys.path.append('../padim')
 sys.path.append('../deep_svdd/src')
 
 from padim import PaDiMSVDD
+from padim.datasets import LimitedDataset
 
 
 logging.basicConfig(filename='logs/padeep.log', level=logging.INFO)
@@ -24,6 +25,7 @@ parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
 parser.add_argument("--n_epochs", type=int, default=1)
+parser.add_argument("--train_limit", type=int, default=-1)
 
 args = parser.parse_args()
 
@@ -43,7 +45,10 @@ img_transforms = transforms.Compose([
 ])
 
 train_dataloader = DataLoader(
-    dataset=ImageFolder(root=args.train_folder, transform=img_transforms),
+    dataset=LimitedDataset(
+        ImageFolder(root=args.train_folder, transform=img_transforms),
+        limit=args.train_limit
+    ),
     batch_size=16,
     num_workers=16,
     shuffle=True,
@@ -60,7 +65,7 @@ test_batch, _ = next(test_iter)
 
 padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs, test_images=test_batch)
 
-results = padeep.predict(next_batch)
+results = padeep.predict(test_batch)
 
 utils.save_image(test_batch, 'inputs.png')
 utils.save_image(results, 'outputs.png')
