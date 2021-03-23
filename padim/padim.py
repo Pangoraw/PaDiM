@@ -8,11 +8,11 @@ from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
-from padim.utils import embeddings_concat
 from padim.backbones import ResNet18, WideResNet50
+from padim.base import PaDiMBase
 
 
-class PaDiM:
+class PaDiM(PaDiMBase):
     """
     The PaDiM model
     """
@@ -23,48 +23,12 @@ class PaDiM:
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
     ):
-        self.device = device
-        self.num_embeddings = num_embeddings
-
-        self._init_backbone(backbone)
-
+        super(PaDiM, self).__init__(num_embeddings, device, backbone)
         self.N = 0
-        self.embedding_ids = torch.randperm(self.max_embeddings_size)[
-            : self.num_embeddings
-        ].to(self.device)
-        self.means = torch.zeros((self.num_embeddings, self.num_patches)).to(
-            self.device
-        )
-        self.covs = torch.zeros(
-            (self.num_embeddings, self.num_embeddings, self.num_patches)
-        ).to(self.device)
-
-    def _init_backbone(self, backbone: str) -> None:
-        if backbone == "resnet18":
-            self.model = ResNet18().to(self.device)
-        elif backbone == "wide_resnet50":
-            self.model = WideResNet50().to(self.device)
-        else:
-            raise Exception(
-                f"unknown backbone {backbone}, "
-                "choose one of ['resnet18', 'wide_resnet50']"
-            )
-
-        self.num_patches = self.model.num_patches
-        self.max_embeddings_size = self.model.embeddings_size
-
-    def _embed_batch(self, imgs: Tensor) -> Tensor:
-        self.model.eval()
-        with torch.no_grad():
-            feature_1, feature_2, feature_3 = self.model(imgs.to(self.device))
-        embeddings = embeddings_concat(feature_1, feature_2)
-        embeddings = embeddings_concat(embeddings, feature_3)
-        embeddings = torch.index_select(
-            embeddings,
-            dim=1,
-            index=self.embedding_ids,
-        )
-        return embeddings
+        self.means = torch.zeros(
+            (self.num_embeddings, self.num_patches)).to(self.device)
+        self.covs = torch.zeros((self.num_embeddings, self.num_embeddings,
+                                 self.num_patches)).to(self.device)
 
     def train_one_batch(self, imgs: Tensor) -> None:
         """
@@ -78,14 +42,13 @@ class PaDiM:
             embeddings = self._embed_batch(imgs.to(self.device))
             b = embeddings.size(0)
             embeddings = embeddings.reshape(
-                (-1, self.num_embeddings, self.num_patches)
-            )  # b * c * (w * h)
+                (-1, self.num_embeddings, self.num_patches))  # b * c * (w * h)
             for i in range(self.num_patches):
                 patch_embeddings = embeddings[:, :, i]  # b * c
                 for j in range(b):
                     self.covs[:, :, i] += torch.outer(
-                        patch_embeddings[j, :], patch_embeddings[j, :]
-                    )  # c * c
+                        patch_embeddings[j, :],
+                        patch_embeddings[j, :])  # c * c
                 self.means[:, i] += patch_embeddings.sum(dim=0)  # c
             self.N += b  # number of images
 
@@ -106,9 +69,8 @@ class PaDiM:
         means, covs, embedding_ids = self.get_params()
         return means, covs, embedding_ids
 
-    def get_params(
-        self, epsilon: float = 0.01
-    ) -> Tuple[Tensor, Tensor, Tensor]:
+    def get_params(self,
+                   epsilon: float = 0.01) -> Tuple[Tensor, Tensor, Tensor]:
         """
         Computes the mean vectors and covariance matrices from the
         indermediary state
@@ -159,9 +121,9 @@ class PaDiM:
             inv_cvars[:, :, i] = np.linalg.inv(covs[:, :, i])
         return inv_cvars
 
-    def predict(
-        self, new_imgs: Tensor, params: Tuple[NDArray, NDArray] = None
-    ) -> NDArray:
+    def predict(self,
+                new_imgs: Tensor,
+                params: Tuple[NDArray, NDArray] = None) -> NDArray:
         """
         Computes the distance matrix for each image * patch
         Params
@@ -213,29 +175,17 @@ class PaDiM:
         def detach_numpy(t: Tensor) -> NDArray:
             return t.detach().cpu().numpy()
 
-        return (
-            self.N,
-            detach_numpy(self.means),
-            detach_numpy(self.covs),
-            detach_numpy(self.embedding_ids),
-            backbone
-        )
+        return (self.N, detach_numpy(self.means), detach_numpy(self.covs),
+                detach_numpy(self.embedding_ids), backbone)
 
     @staticmethod
-    def from_residuals(
-        N: int,
-        means: NDArray,
-        covs: NDArray,
-        embedding_ids: NDArray,
-        backbone: str,
-        device: Union[Device, str]
-    ):
+    def from_residuals(N: int, means: NDArray, covs: NDArray,
+                       embedding_ids: NDArray, backbone: str,
+                       device: Union[Device, str]):
         num_embeddings, = embedding_ids.shape
-        padim = PaDiM(
-            num_embeddings=num_embeddings,
-            device=device,
-            backbone=backbone
-        )
+        padim = PaDiM(num_embeddings=num_embeddings,
+                      device=device,
+                      backbone=backbone)
         padim.embedding_ids = torch.tensor(embedding_ids).to(device)
         padim.N = N
         padim.means = torch.tensor(means).to(device)
