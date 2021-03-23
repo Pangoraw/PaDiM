@@ -77,37 +77,48 @@ class PaDiMSVDD(PaDiMBase):
 
     def __init__(
         self,
-        train_image_folder,
-        test_image_folder,
         num_embeddings: int = 100,
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
+        **kwargs,
     ):
         super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
         self.svdd = DeepSVDD()
         self.svdd.set_network("mnist_LeNet")
 
-        def encoder(img: Tensor) -> Tensor:
-            """Transforms images to embedding vectors"""
-            embeddings = self._embed_batch(img.unsqueeze(0))  # N * C * H * W
-            _, C, H, W = embeddings.shape
-            embeddings = embeddings.view((H * W, C))
-            return embeddings
+        self._init_params(**kwargs)
 
-        img_transforms = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Resize((416, 416)),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-                inplace=True,
-            ),
-        ])
-        self.image_ad_dataset = ImageFolderADDataset(
-            train_image_folder,
-            test_image_folder,
-            img_transforms=img_transforms,
-            target_transform=encoder)
+    def _init_params(self,
+                     objective='one-class',
+                     R=0.0,
+                     nu=0.1,
+                     lr: float = 0.001,
+                     weight_decay=1e-6,
+                     lr_milestones=(),
+                     optimizer_name='adam'):
+        assert objective in (
+            'one-class', 'soft-boundary'
+        ), "Objective must be either 'one-class' or 'soft-boundary'."
+        self.objective = objective
+
+        self.R = torch.tensor(R, device=self.device)
+        self.c = None
+
+        self.lr = lr
+        self.nu = nu
+        # number of training epochs for soft-boundary
+        # Deep SVDD before radius R gets updated
+        self.warm_up_n_epochs = 10
+
+        self.lr_milestones = lr_milestones
+        self.weight_decay = weight_decay
+        self.optimizer_name = optimizer_name
+
+        # Results
+        self.train_time = None
+        self.test_auc = None
+        self.test_time = None
+        self.test_scores = None
 
     def train(self, **kwargs):
         self.svdd.train(self.image_ad_dataset, device=self.device, **kwargs)
@@ -115,7 +126,7 @@ class PaDiMSVDD(PaDiMBase):
     def _embed_batch_flatten(self, imgs):
         embeddings = self._embed_batch(imgs)
         _, C, _, _ = embeddings.shape
-        return embeddings.view((-1, C))
+        return embeddings.view((-1, 1, 10, 10))
 
     def train_home_made(self, dataloader, n_epochs=10):
         logger = logging.getLogger()
@@ -132,18 +143,13 @@ class PaDiMSVDD(PaDiMBase):
         scheduler = optim.lr_scheduler.MultiStepLR(
             optimizer, milestones=self.lr_milestones, gamma=0.1)
 
-        if self.svdd.c is None:
+        if self.c is None:
             logger.info('Initializing center c...')
-            self.svdd.c = self.init_center_c(dataloader)
+            self.c = self._init_center_c(dataloader)
             logger.info('Center c initialized.')
 
-        self.svdd.model.train()
+        self.svdd.net.train()
         for epoch in tqdm(range(n_epochs)):
-            scheduler.step()
-            if epoch in self.svdd.lr_milestones:
-                logger.info('\tLR Scheduler: new learning rate is %g' %
-                            float(scheduler.get_lr()[0]))
-
             loss_epoch = 0.0
             n_batches = 0
             for imgs, _ in dataloader:
@@ -153,10 +159,10 @@ class PaDiMSVDD(PaDiMBase):
 
                 embeddings = self._embed_batch_flatten(imgs)
                 outputs = self.svdd.net(embeddings)
-                dist = torch.sum((outputs - self.svdd.c)**2, dim=1)
-                if self.svdd.objective == 'soft-boundary':
-                    scores = dist - self.svdd.R**2
-                    loss = self.svdd.R**2 + (1 / self.svdd.nu) * torch.mean(
+                dist = torch.sum((outputs - self.c)**2, dim=1)
+                if self.objective == 'soft-boundary':
+                    scores = dist - self.R**2
+                    loss = self.R**2 + (1 / self.nu) * torch.mean(
                         torch.max(torch.zeros_like(scores), scores))
                 else:
                     loss = torch.mean(dist)
@@ -164,14 +170,19 @@ class PaDiMSVDD(PaDiMBase):
                 loss.backward()
                 optimizer.step()
 
-                if (self.svdd.objective == 'soft-boundary') and (
-                        epoch >= self.svdd.warm_up_n_epochs):
-                    self.svdd.R.data = torch.tensor(get_radius(dist, self.nu),
-                                                    device=self.device)
+                if (self.objective == 'soft-boundary') and (
+                        epoch >= self.warm_up_n_epochs):
+                    self.R.data = torch.tensor(get_radius(dist, self.nu),
+                                               device=self.device)
                 loss_epoch += loss.item()
                 n_batches += 1
             logger.info('\tEpoch {}/{}\tLoss: {:.8f}'.format(
                 epoch + 1, n_epochs, loss_epoch / n_batches))
+
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('\tLR Scheduler: new learning rate is %g' %
+                            float(scheduler.get_lr()[0]))
 
         logger.info('Finished training.')
 
@@ -186,7 +197,7 @@ class PaDiMSVDD(PaDiMBase):
                 inputs = inputs.to(self.device)
                 inputs = self._embed_batch_flatten(inputs)
 
-                outputs = self.vdd.net(inputs)
+                outputs = self.svdd.net(inputs)
                 n_samples += outputs.size(0)
                 c += torch.sum(outputs, dim=0)
         c /= n_samples
@@ -198,5 +209,16 @@ class PaDiMSVDD(PaDiMBase):
 
         return c
 
-    def test(self, **kwargs):
-        self.svdd.test(self.image_ad_dataset, device=self.device)
+    def predict(self, batch: Tensor):
+        self.svdd.net.eval()
+
+        embeddings = self._embed_batch_flatten(batch)
+        outputs = self.svdd.net(embeddings)
+        dists = torch.sum((outputs - self.c) ** 2, dim=1)
+        if self.objective == 'soft-boundary':
+            scores = dists - self.R ** 2
+        else:
+            scores = dists
+
+        # Return anomaly maps
+        return scores.reshape((-1, 1, 104, 104))

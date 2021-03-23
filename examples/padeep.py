@@ -4,7 +4,7 @@ import sys
 
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
-from torchvision import transforms
+from torchvision import transforms, utils
 
 sys.path.append('../padim')
 sys.path.append('../deep_svdd/src')
@@ -22,13 +22,12 @@ root.info('Starting training')
 parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
+parser.add_argument("--n_epochs", type=int, default=1)
 
 args = parser.parse_args()
 
-padeep = PaDiMSVDD(args.train_folder,
-                   args.test_folder,
-                   backbone='wide_resnet50', 
-                   device='cuda')
+padeep = PaDiMSVDD(backbone='wide_resnet50', 
+                   device='cpu')
 
 img_transforms = transforms.Compose([
     transforms.ToTensor(),
@@ -47,5 +46,17 @@ train_dataloader = DataLoader(
     shuffle=True,
 )
 
-padeep.train_home_made(train_dataloader, n_epochs=1)
-# padeep.test()
+padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs)
+
+test_dataloader = DataLoader(
+    dataset=ImageFolder(root=args.test_folder, transform=img_transforms),
+    batch_size=4,
+    shuffle=True,
+)
+test_iter = iter(test_dataloader)
+next_batch, _ = next(test_iter)
+
+results = padeep.predict(next_batch)
+
+utils.save_image(next_batch, 'inputs.png')
+utils.save_image(results, 'outputs.png')
