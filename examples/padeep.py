@@ -2,6 +2,7 @@ import argparse
 import logging
 import sys
 
+import torch
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision import transforms, utils
@@ -26,8 +27,10 @@ parser.add_argument("--n_epochs", type=int, default=1)
 
 args = parser.parse_args()
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 padeep = PaDiMSVDD(backbone='wide_resnet50', 
-                   device='cpu')
+                   device=device)
 
 img_transforms = transforms.Compose([
     transforms.ToTensor(),
@@ -46,7 +49,6 @@ train_dataloader = DataLoader(
     shuffle=True,
 )
 
-padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs)
 
 test_dataloader = DataLoader(
     dataset=ImageFolder(root=args.test_folder, transform=img_transforms),
@@ -54,9 +56,11 @@ test_dataloader = DataLoader(
     shuffle=True,
 )
 test_iter = iter(test_dataloader)
-next_batch, _ = next(test_iter)
+test_batch, _ = next(test_iter)
+
+padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs, test_images=test_batch)
 
 results = padeep.predict(next_batch)
 
-utils.save_image(next_batch, 'inputs.png')
+utils.save_image(test_batch, 'inputs.png')
 utils.save_image(results, 'outputs.png')

@@ -4,13 +4,10 @@ import logging
 import numpy as np
 import torch
 from torch import Tensor, device as Device, optim
-from torch.utils.data import Dataset, DataLoader
-from torchvision.datasets import ImageFolder
-from torchvision import transforms
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from deep_svdd.src.deepSVDD import DeepSVDD
-from deep_svdd.src.base import BaseADDataset
 
 from padim.base import PaDiMBase
 
@@ -18,56 +15,6 @@ from padim.base import PaDiMBase
 def get_radius(dist: torch.Tensor, nu: float):
     """Optimally solve for radius R via the (1-nu)-quantile of distances."""
     return np.quantile(np.sqrt(dist.clone().data.cpu().numpy()), 1 - nu)
-
-
-class TransformingDataset(Dataset):
-    def __init__(self, root, img_transforms, target_transform):
-        self.img_dataset = ImageFolder(root=root, transform=img_transforms)
-        self.target_transform = target_transform
-        self.current_img_index = 0
-        img, _ = self.img_dataset[0]
-        self.current_img_embeddings = self.target_transform(img)
-
-    def __getitem__(self, index):
-        img_index = index // (104 * 104)
-        if self.current_img_index != img_index:
-            self.current_img_index = img_index
-            img, _ = self.img_dataset[img_index]
-            self.current_img_embeddings = self.target_transform(img)
-
-        embedding_idx = index % (104 * 104)
-        return (self.current_img_embeddings[embedding_idx, :].reshape(
-            (1, 10, 10)), 0, 0)
-
-    def __len__(self):
-        return len(self.img_dataset) * 104 * 104
-
-
-class ImageFolderADDataset(BaseADDataset):
-    def __init__(self, train_image_folder, test_image_folder, img_transforms,
-                 target_transform):
-        super(ImageFolderADDataset, self).__init__(train_image_folder)
-        self.train_set = TransformingDataset(train_image_folder,
-                                             img_transforms, target_transform)
-        self.test_set = TransformingDataset(test_image_folder,
-                                            img_transforms,
-                                            target_transform=target_transform)
-
-    def loaders(self,
-                batch_size: int,
-                shuffle_train=True,
-                shuffle_test=False,
-                num_workers: int = 0):
-        train_dataloader = DataLoader(num_workers=num_workers,
-                                      batch_size=batch_size,
-                                      shuffle=shuffle_train,
-                                      dataset=self.train_set)
-        test_dataloader = DataLoader(num_workers=num_workers,
-                                     batch_size=batch_size,
-                                     shuffle=shuffle_test,
-                                     dataset=self.test_set)
-
-        return train_dataloader, test_dataloader
 
 
 class PaDiMSVDD(PaDiMBase):
@@ -128,10 +75,23 @@ class PaDiMSVDD(PaDiMBase):
         _, C, _, _ = embeddings.shape
         return embeddings.view((-1, 1, 10, 10))
 
-    def train_home_made(self, dataloader, n_epochs=10):
+    def train_home_made(self, dataloader, n_epochs=10, test_images=None):
         logger = logging.getLogger()
 
         self.svdd.net = self.svdd.net.to(self.device)
+
+        loss_writer = SummaryWriter("tboard/losses")
+        if test_images is not None:
+            image_writer = SummaryWriter("tboard/images")
+
+            def make_test(global_step):
+                anomalies = self.predict(test_images)
+                image_writer.add_image("Images/Anomalies", anomalies,
+                                       global_step)
+        else:
+
+            def make_test(_):
+                pass
 
         # Set optimizer (Adam optimizer for now)
         optimizer = optim.Adam(self.svdd.net.parameters(),
@@ -178,8 +138,10 @@ class PaDiMSVDD(PaDiMBase):
                 n_batches += 1
             logger.info('\tEpoch {}/{}\tLoss: {:.8f}'.format(
                 epoch + 1, n_epochs, loss_epoch / n_batches))
+            loss_writer.add_scalar("losses", loss_epoch, epoch)
 
             scheduler.step()
+            make_test(epoch)
             if epoch in self.lr_milestones:
                 logger.info('\tLR Scheduler: new learning rate is %g' %
                             float(scheduler.get_lr()[0]))
@@ -214,9 +176,9 @@ class PaDiMSVDD(PaDiMBase):
 
         embeddings = self._embed_batch_flatten(batch)
         outputs = self.svdd.net(embeddings)
-        dists = torch.sum((outputs - self.c) ** 2, dim=1)
+        dists = torch.sum((outputs - self.c)**2, dim=1)
         if self.objective == 'soft-boundary':
-            scores = dists - self.R ** 2
+            scores = dists - self.R**2
         else:
             scores = dists
 
