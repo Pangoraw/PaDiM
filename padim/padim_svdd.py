@@ -1,14 +1,23 @@
 from typing import Union
+import logging
 
-from torch import Tensor, device as Device
+import numpy as np
+import torch
+from torch import Tensor, device as Device, optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision import transforms
+from tqdm import tqdm
 
 from deep_svdd.src.deepSVDD import DeepSVDD
 from deep_svdd.src.base import BaseADDataset
 
 from padim.base import PaDiMBase
+
+
+def get_radius(dist: torch.Tensor, nu: float):
+    """Optimally solve for radius R via the (1-nu)-quantile of distances."""
+    return np.quantile(np.sqrt(dist.clone().data.cpu().numpy()), 1 - nu)
 
 
 class TransformingDataset(Dataset):
@@ -20,14 +29,15 @@ class TransformingDataset(Dataset):
         self.current_img_embeddings = self.target_transform(img)
 
     def __getitem__(self, index):
-        img_index = index // (104*104)
+        img_index = index // (104 * 104)
         if self.current_img_index != img_index:
             self.current_img_index = img_index
             img, _ = self.img_dataset[img_index]
             self.current_img_embeddings = self.target_transform(img)
 
         embedding_idx = index % (104 * 104)
-        return self.current_img_embeddings[embedding_idx, :].reshape((1, 10, 10)), 0, 0
+        return (self.current_img_embeddings[embedding_idx, :].reshape(
+            (1, 10, 10)), 0, 0)
 
     def __len__(self):
         return len(self.img_dataset) * 104 * 104
@@ -101,6 +111,92 @@ class PaDiMSVDD(PaDiMBase):
 
     def train(self, **kwargs):
         self.svdd.train(self.image_ad_dataset, device=self.device, **kwargs)
+
+    def _embed_batch_flatten(self, imgs):
+        embeddings = self._embed_batch(imgs)
+        _, C, _, _ = embeddings.shape
+        return embeddings.view((-1, C))
+
+    def train_home_made(self, dataloader, n_epochs=10):
+        logger = logging.getLogger()
+
+        self.svdd.net = self.svdd.net.to(self.device)
+
+        # Set optimizer (Adam optimizer for now)
+        optimizer = optim.Adam(self.svdd.net.parameters(),
+                               lr=self.lr,
+                               weight_decay=self.weight_decay,
+                               amsgrad=self.optimizer_name == 'amsgrad')
+
+        # Set learning rate scheduler
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=self.lr_milestones, gamma=0.1)
+
+        if self.svdd.c is None:
+            logger.info('Initializing center c...')
+            self.svdd.c = self.init_center_c(dataloader)
+            logger.info('Center c initialized.')
+
+        self.svdd.model.train()
+        for epoch in tqdm(range(n_epochs)):
+            scheduler.step()
+            if epoch in self.svdd.lr_milestones:
+                logger.info('\tLR Scheduler: new learning rate is %g' %
+                            float(scheduler.get_lr()[0]))
+
+            loss_epoch = 0.0
+            n_batches = 0
+            for imgs, _ in dataloader:
+                imgs = imgs.to(self.device)
+
+                optimizer.zero_grad()
+
+                embeddings = self._embed_batch_flatten(imgs)
+                outputs = self.svdd.net(embeddings)
+                dist = torch.sum((outputs - self.svdd.c)**2, dim=1)
+                if self.svdd.objective == 'soft-boundary':
+                    scores = dist - self.svdd.R**2
+                    loss = self.svdd.R**2 + (1 / self.svdd.nu) * torch.mean(
+                        torch.max(torch.zeros_like(scores), scores))
+                else:
+                    loss = torch.mean(dist)
+
+                loss.backward()
+                optimizer.step()
+
+                if (self.svdd.objective == 'soft-boundary') and (
+                        epoch >= self.svdd.warm_up_n_epochs):
+                    self.svdd.R.data = torch.tensor(get_radius(dist, self.nu),
+                                                    device=self.device)
+                loss_epoch += loss.item()
+                n_batches += 1
+            logger.info('\tEpoch {}/{}\tLoss: {:.8f}'.format(
+                epoch + 1, n_epochs, loss_epoch / n_batches))
+
+        logger.info('Finished training.')
+
+        return self.svdd.net
+
+    def _init_center_c(self, dataloader, eps=0.1):
+        n_samples = 0
+        c = torch.zeros(self.svdd.net.rep_dim, device=self.device)
+        self.svdd.net.eval()
+        with torch.no_grad():
+            for inputs, _ in tqdm(dataloader):
+                inputs = inputs.to(self.device)
+                inputs = self._embed_batch_flatten(inputs)
+
+                outputs = self.vdd.net(inputs)
+                n_samples += outputs.size(0)
+                c += torch.sum(outputs, dim=0)
+        c /= n_samples
+
+        # If c_i is too close to 0, set to +-eps.
+        # Reason: a zero unit can be trivially matched with zero weights.
+        c[(abs(c) < eps) & (c < 0)] = -eps
+        c[(abs(c) < eps) & (c > 0)] = eps
+
+        return c
 
     def test(self, **kwargs):
         self.svdd.test(self.image_ad_dataset, device=self.device)
