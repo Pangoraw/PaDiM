@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor, device as Device, optim
 from torch.utils.tensorboard import SummaryWriter
+from torchvision import utils as visionutils
 from tqdm import tqdm
 
 from deep_svdd.src.deepSVDD import DeepSVDD
@@ -86,7 +87,8 @@ class PaDiMSVDD(PaDiMBase):
 
             def make_test(global_step):
                 anomalies = self.predict(test_images)
-                image_writer.add_image("Images/Anomalies", anomalies,
+                anomalies_grid = visionutils.make_grid(anomalies)
+                image_writer.add_image("Images/Anomalies", anomalies_grid,
                                        global_step)
         else:
 
