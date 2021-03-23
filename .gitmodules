@@ -1,0 +1,3 @@
+[submodule "deep_svdd"]
+	path = deep_svdd
+	url = https://github.com/Pangoraw/Deep-SVDD-PyTorch.git
