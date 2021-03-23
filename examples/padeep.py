@@ -1,5 +1,6 @@
-import sys
 import argparse
+import logging
+import sys
 
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
@@ -11,6 +12,13 @@ sys.path.append('../deep_svdd/src')
 from padim import PaDiMSVDD
 
 
+logging.basicConfig(filename='logs/padeep.log', level=logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+
+root = logging.getLogger()
+root.addHandler(handler)
+root.info('Starting training')
+
 parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
@@ -19,7 +27,8 @@ args = parser.parse_args()
 
 padeep = PaDiMSVDD(args.train_folder,
                    args.test_folder,
-                   backbone='wide_resnet50')
+                   backbone='wide_resnet50', 
+                   device='cuda')
 
 img_transforms = transforms.Compose([
     transforms.ToTensor(),

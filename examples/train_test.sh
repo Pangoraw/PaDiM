@@ -27,4 +27,5 @@ python examples/test_semmacape.py \
   --iou_threshold $IOU_THRESHOLD \
   --params_path $PARAMS_PATH \
   --min_area $MIN_AREA \
+  --use_nms \
   | tee -a $LOG_FILE
