@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
 parser.add_argument("--n_epochs", type=int, default=1)
+parser.add_argument("--ae_n_epochs", type=int, default=1)
 parser.add_argument("--train_limit", type=int, default=-1)
 parser.add_argument("--pretrain", action="store_true")
 
@@ -65,7 +66,7 @@ test_batch, _ = next(test_iter)
 
 if args.pretrain:
     root.info('Starting pretraining')
-    padeep.pretrain(train_dataloader, n_epochs=args.n_epochs)
+    padeep.pretrain(train_dataloader, n_epochs=args.ae_n_epochs)
     root.info('Pretraining done')
 
 root.info('Starting training')

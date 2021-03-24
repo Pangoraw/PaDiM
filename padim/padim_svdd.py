@@ -43,7 +43,7 @@ class PaDiMSVDD(PaDiMBase):
                      nu=0.1,
                      lr: float = 0.001,
                      weight_decay=1e-6,
-                     lr_milestones=(),
+                     lr_milestones=(30, 50),
                      optimizer_name='adam'):
         assert objective in (
             'one-class', 'soft-boundary'
