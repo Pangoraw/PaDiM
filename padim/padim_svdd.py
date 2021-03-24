@@ -9,6 +9,7 @@ from torchvision import utils as visionutils
 from tqdm import tqdm
 
 from deep_svdd.src.deepSVDD import DeepSVDD
+from deep_svdd.src.networks import build_autoencoder
 
 from padim.base import PaDiMBase
 
@@ -32,7 +33,7 @@ class PaDiMSVDD(PaDiMBase):
     ):
         super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
         self.svdd = DeepSVDD()
-        self.svdd.set_network("mnist_LeNet")
+        self.svdd.set_network("MLPNet")
 
         self._init_params(**kwargs)
 
@@ -74,7 +75,57 @@ class PaDiMSVDD(PaDiMBase):
     def _embed_batch_flatten(self, imgs):
         embeddings = self._embed_batch(imgs)
         _, C, _, _ = embeddings.shape
-        return embeddings.view((-1, 1, 10, 10))
+        return embeddings.view((-1, C))
+
+    def pretrain(self, dataloader, n_epochs=10):
+        logger = logging.getLogger()
+
+        ae_net = build_autoencoder('MLPNet').to(self.device)
+        ae_net.train()
+
+        # Set optimizer (Adam optimizer for now)
+        optimizer = optim.Adam(ae_net.parameters(),
+                               lr=self.lr,
+                               weight_decay=self.weight_decay,
+                               amsgrad=self.optimizer_name == 'amsgrad')
+
+        # Set learning rate scheduler
+        scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=self.lr_milestones, gamma=0.1)
+
+        for epoch in tqdm(range(n_epochs)):
+            loss_epoch = 0
+            n_batches = 0
+            for imgs, _ in dataloader:
+                imgs = imgs.to(self.device)
+
+                optimizer.zero_grad()
+
+                embeddings = self._embed_batch_flatten(imgs)
+                outputs = ae_net(embeddings)
+                scores = torch.sum((outputs - embeddings)**2,
+                                   dim=tuple(range(1, outputs.dim())))
+                loss = torch.mean(scores)
+
+                loss.backward()
+                optimizer.step()
+
+                loss_epoch += loss.item()
+                n_batches += 1
+
+            logger.info('  Epoch {}/{}\t Loss: {:.8f}'.format(
+                epoch + 1, n_epochs, loss_epoch / n_batches))
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' %
+                            float(scheduler.get_lr()))
+        net_dict = self.svdd.net.state_dict()
+        ae_dict = ae_net.state_dict()
+
+        ae_net_dict = {k: v for k, v in ae_dict.items() if k in net_dict}
+        net_dict.update(ae_net_dict)
+
+        self.svdd.net.load_state_dict(net_dict)
 
     def train_home_made(self, dataloader, n_epochs=10, test_images=None):
         logger = logging.getLogger()

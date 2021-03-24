@@ -19,13 +19,13 @@ handler = logging.StreamHandler(sys.stdout)
 
 root = logging.getLogger()
 root.addHandler(handler)
-root.info('Starting training')
 
 parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--train_limit", type=int, default=-1)
+parser.add_argument("--pretrain", action="store_true")
 
 args = parser.parse_args()
 
@@ -63,6 +63,12 @@ test_dataloader = DataLoader(
 test_iter = iter(test_dataloader)
 test_batch, _ = next(test_iter)
 
+if args.pretrain:
+    root.info('Starting pretraining')
+    padeep.pretrain(train_dataloader, n_epochs=args.n_epochs)
+    root.info('Pretraining done')
+
+root.info('Starting training')
 padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs, test_images=test_batch)
 
 results = padeep.predict(test_batch)
