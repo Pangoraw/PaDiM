@@ -9,7 +9,7 @@ from torchvision import utils as visionutils
 from tqdm import tqdm
 
 from deep_svdd.src.deepSVDD import DeepSVDD
-from deep_svdd.src.networks import build_autoencoder
+from deep_svdd.src.networks import build_network, build_autoencoder
 
 from padim.base import PaDiMBase
 
@@ -33,14 +33,20 @@ class PaDiMSVDD(PaDiMBase):
     ):
         super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
         self.svdd = DeepSVDD()
-        self.svdd.set_network("MLPNet")
-
         self._init_params(**kwargs)
+
+        self.svdd.net_name = "MLPNet"
+        self.net = build_network("MLPNet",
+                                 input_size=self.num_embeddings,
+                                 rep_dim=self.rep_dim,
+                                 features_e=self.features_e)
 
     def _init_params(self,
                      objective='one-class',
                      R=0.0,
                      nu=0.1,
+                     features_e=16,
+                     rep_dim=32,
                      lr: float = 0.001,
                      weight_decay=1e-6,
                      lr_milestones=(30, 50),
@@ -52,6 +58,9 @@ class PaDiMSVDD(PaDiMBase):
 
         self.R = torch.tensor(R, device=self.device)
         self.c = None
+
+        self.features_e = features_e
+        self.rep_dim = rep_dim
 
         self.lr = lr
         self.nu = nu
@@ -80,7 +89,8 @@ class PaDiMSVDD(PaDiMBase):
     def pretrain(self, dataloader, n_epochs=10):
         logger = logging.getLogger()
 
-        ae_net = build_autoencoder('MLPNet').to(self.device)
+        ae_net = build_autoencoder(
+            'MLPNet', input_size=self.num_embeddings).to(self.device)
         ae_net.train()
 
         # Set optimizer (Adam optimizer for now)
