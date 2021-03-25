@@ -118,7 +118,7 @@ class PaDiMSVDD(PaDiMBase):
             scheduler.step()
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' %
-                            float(scheduler.get_lr()))
+                            float(scheduler.get_last_lr()))
         net_dict = self.svdd.net.state_dict()
         ae_dict = ae_net.state_dict()
 
@@ -127,7 +127,7 @@ class PaDiMSVDD(PaDiMBase):
 
         self.svdd.net.load_state_dict(net_dict)
 
-    def train_home_made(self, dataloader, n_epochs=10, test_images=None):
+    def train_home_made(self, dataloader, n_epochs=10, test_images=None, test_cb=None):
         logger = logging.getLogger()
 
         self.svdd.net = self.svdd.net.to(self.device)
@@ -201,6 +201,11 @@ class PaDiMSVDD(PaDiMBase):
             if epoch in self.lr_milestones:
                 logger.info('\tLR Scheduler: new learning rate is %g' %
                             float(scheduler.get_lr()[0]))
+
+            if test_cb is not None:
+                with torch.no_grad():
+                    test_cb(epoch)
+                self.svdd.net.train()
 
         logger.info('Finished training.')
 
