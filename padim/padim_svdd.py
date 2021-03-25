@@ -133,7 +133,7 @@ class PaDiMSVDD(PaDiMBase):
             scheduler.step()
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' %
-                            float(scheduler.get_last_lr()))
+                            float(scheduler.get_last_lr()[0]))
             if test_cb is not None:
                 ae_net.eval()
                 with torch.no_grad():
@@ -228,7 +228,7 @@ class PaDiMSVDD(PaDiMBase):
             make_test(epoch)
             if epoch in self.lr_milestones:
                 logger.info('\tLR Scheduler: new learning rate is %g' %
-                            float(scheduler.get_lr()[0]))
+                            float(scheduler.get_last_lr()[0]))
 
             if test_cb is not None:
                 with torch.no_grad():
