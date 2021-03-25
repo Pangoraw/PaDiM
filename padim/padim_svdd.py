@@ -36,7 +36,7 @@ class PaDiMSVDD(PaDiMBase):
         self._init_params(**kwargs)
 
         self.svdd.net_name = "MLPNet"
-        self.net = build_network("MLPNet",
+        self.svdd.net = build_network("MLPNet",
                                  input_size=self.num_embeddings,
                                  rep_dim=self.rep_dim,
                                  features_e=self.features_e)
@@ -90,7 +90,10 @@ class PaDiMSVDD(PaDiMBase):
         logger = logging.getLogger()
 
         ae_net = build_autoencoder(
-            'MLPNet', input_size=self.num_embeddings).to(self.device)
+            'MLPNet',
+            input_size=self.num_embeddings,
+            rep_dim=self.rep_dim,
+            features_e=self.features_e).to(self.device)
         ae_net.train()
 
         # Set optimizer (Adam optimizer for now)
