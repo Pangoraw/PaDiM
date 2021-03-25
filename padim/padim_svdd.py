@@ -37,9 +37,9 @@ class PaDiMSVDD(PaDiMBase):
 
         self.svdd.net_name = "MLPNet"
         self.svdd.net = build_network("MLPNet",
-                                 input_size=self.num_embeddings,
-                                 rep_dim=self.rep_dim,
-                                 features_e=self.features_e)
+                                      input_size=self.num_embeddings,
+                                      rep_dim=self.rep_dim,
+                                      features_e=self.features_e)
 
     def _init_params(self,
                      objective='one-class',
@@ -86,14 +86,13 @@ class PaDiMSVDD(PaDiMBase):
         _, C, _, _ = embeddings.shape
         return embeddings.permute(0, 2, 3, 1).reshape((-1, C))
 
-    def pretrain(self, dataloader, n_epochs=10):
+    def pretrain(self, dataloader, n_epochs=10, test_cb=None):
         logger = logging.getLogger()
 
-        ae_net = build_autoencoder(
-            'MLPNet',
-            input_size=self.num_embeddings,
-            rep_dim=self.rep_dim,
-            features_e=self.features_e).to(self.device)
+        ae_net = build_autoencoder('MLPNet',
+                                   input_size=self.num_embeddings,
+                                   rep_dim=self.rep_dim,
+                                   features_e=self.features_e).to(self.device)
         ae_net.train()
 
         # Set optimizer (Adam optimizer for now)
@@ -132,6 +131,11 @@ class PaDiMSVDD(PaDiMBase):
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' %
                             float(scheduler.get_last_lr()))
+            if test_cb is not None:
+                ae_net.eval()
+                with torch.no_grad():
+                    test_cb(ae_net, epoch)
+                ae_net.train()
         net_dict = self.svdd.net.state_dict()
         ae_dict = ae_net.state_dict()
 
@@ -140,7 +144,11 @@ class PaDiMSVDD(PaDiMBase):
 
         self.svdd.net.load_state_dict(net_dict)
 
-    def train_home_made(self, dataloader, n_epochs=10, test_images=None, test_cb=None):
+    def train_home_made(self,
+                        dataloader,
+                        n_epochs=10,
+                        test_images=None,
+                        test_cb=None):
         logger = logging.getLogger()
 
         self.svdd.net = self.svdd.net.to(self.device)
