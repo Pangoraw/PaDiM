@@ -105,7 +105,8 @@ class PaDiMSVDD(PaDiMBase):
         scheduler = optim.lr_scheduler.MultiStepLR(
             optimizer, milestones=self.lr_milestones, gamma=0.1)
 
-        for epoch in tqdm(range(n_epochs)):
+        pbar = tqdm(range(n_epochs))
+        for epoch in pbar:
             loss_epoch = 0
             n_batches = 0
             for imgs, _ in dataloader:
@@ -125,8 +126,10 @@ class PaDiMSVDD(PaDiMBase):
                 loss_epoch += loss.item()
                 n_batches += 1
 
-            logger.info('  Epoch {}/{}\t Loss: {:.8f}'.format(
-                epoch + 1, n_epochs, loss_epoch / n_batches))
+            message = '\tEpoch {}/{}\t Loss: {:.8f}'.format(
+                epoch + 1, n_epochs, loss_epoch / n_batches)
+            pbar.set_description(message)
+            logger.info(message)
             scheduler.step()
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' %
@@ -186,7 +189,8 @@ class PaDiMSVDD(PaDiMBase):
             logger.info('C is at %f' % torch.sum(self.c**2).item())
 
         self.svdd.net.train()
-        for epoch in tqdm(range(n_epochs)):
+        pbar = tqdm(range(n_epochs))
+        for epoch in pbar:
             loss_epoch = 0.0
             n_batches = 0
             for imgs, _ in dataloader:
@@ -213,8 +217,11 @@ class PaDiMSVDD(PaDiMBase):
                                                device=self.device)
                 loss_epoch += loss.item()
                 n_batches += 1
-            logger.info('\tEpoch {}/{}\tLoss: {:.8f}'.format(
-                epoch + 1, n_epochs, loss_epoch / n_batches))
+            message = '\tEpoch {}/{}\tLoss: {:.8f}'.format(
+                epoch + 1, n_epochs, loss_epoch / n_batches)
+
+            pbar.set_description(message)
+            logger.info(message)
             loss_writer.add_scalar("losses", loss_epoch, epoch)
 
             scheduler.step()
