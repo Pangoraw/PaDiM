@@ -23,7 +23,6 @@ class PaDiMSVDD(PaDiMBase):
     """A variant of the PaDiM architecture using Deep-SVDD as
     the normal distribution instead of a multi-variate gaussian
     """
-
     def __init__(
         self,
         num_embeddings: int = 100,
@@ -144,7 +143,12 @@ class PaDiMSVDD(PaDiMBase):
 
         self.svdd.net.load_state_dict(net_dict)
 
-    def train(self, dataloader, n_epochs=10, test_images=None, test_cb=None):
+    def train(self,
+              dataloader,
+              n_epochs=10,
+              test_images=None,
+              test_cb=None,
+              outlier_exposure=False):
         logger = logging.getLogger()
 
         self.svdd.net = self.svdd.net.to(self.device)
@@ -186,7 +190,7 @@ class PaDiMSVDD(PaDiMBase):
         for epoch in pbar:
             loss_epoch = 0.0
             n_batches = 0
-            for imgs, _ in dataloader:
+            for imgs, y_true in dataloader:
                 imgs = imgs.to(self.device)
 
                 optimizer.zero_grad()
@@ -199,6 +203,12 @@ class PaDiMSVDD(PaDiMBase):
                     loss = self.R**2 + (1 / self.nu) * torch.mean(
                         torch.max(torch.zeros_like(scores), scores))
                 else:
+                    if outlier_exposure:
+                        mask = torch.zeros((imgs.size(0), 104, 104))
+                        mask[y_true == 1, :, :] = 1.0
+                        mask = mask.reshape((-1, 1))
+                        dist = mask * dist - (
+                            1 - mask) * torch.log(1 - torch.exp(-dist))
                     loss = torch.mean(dist)
 
                 loss.backward()

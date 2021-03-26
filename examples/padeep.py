@@ -3,18 +3,17 @@ import logging
 import sys
 
 import torch
-from torch.utils.data import DataLoader
-from torchvision.datasets import ImageFolder
+from torch.utils.data import DataLoader, Dataset
+from torchvision.datasets import ImageFolder, CIFAR10
 from torchvision import transforms, utils
 
-sys.path.append('../padim')
-sys.path.append('../deep_svdd/src')
+sys.path.append("../padim")
+sys.path.append("../deep_svdd/src")
 
 from padim import PaDiMSVDD
 from padim.datasets import LimitedDataset
 
-
-logging.basicConfig(filename='logs/padeep.log', level=logging.INFO)
+logging.basicConfig(filename="logs/padeep.log", level=logging.INFO)
 handler = logging.StreamHandler(sys.stdout)
 
 root = logging.getLogger()
@@ -30,31 +29,63 @@ parser.add_argument("--pretrain", action="store_true")
 
 args = parser.parse_args()
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
-padeep = PaDiMSVDD(backbone='wide_resnet50', 
-                   device=device)
+padeep = PaDiMSVDD(backbone="wide_resnet50", device=device)
 
-img_transforms = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Resize((416, 416)),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225],
-        inplace=True,
-    ),
-])
 
+class OutlierExposureDataset(Dataset):
+    def __init__(self, normal_dataset, outlier_dataset):
+        self.normal_dataset = normal_dataset
+        self.outlier_dataset = outlier_dataset
+
+    def __getitem__(self, index):
+        cls = index % 2
+        if cls == 1:
+            dataset = self.normal_dataset
+        else:
+            dataset = self.outlier_dataset
+        img, _ = dataset[index // 2]
+        return img, cls
+
+    def __len__(self):
+        return min(len(self.outlier_dataset), len(self.normal_dataset))
+
+
+img_transforms = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Resize((416, 416)),
+        transforms.Normalize(
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
+            inplace=True,
+        ),
+    ]
+)
+
+normal_dataset = LimitedDataset(
+    ImageFolder(root=args.train_folder, transform=img_transforms),
+    limit=args.train_limit,
+)
 train_dataloader = DataLoader(
-    dataset=LimitedDataset(
-        ImageFolder(root=args.train_folder, transform=img_transforms),
-        limit=args.train_limit
+    dataset=OutlierExposureDataset(
+        normal_dataset=normal_dataset,
+        outlier_dataset=CIFAR10(
+            root="./data/", download=True, transform=img_transforms
+        ),
     ),
     batch_size=16,
     num_workers=16,
     shuffle=True,
 )
 
+train_normal_dataloader = DataLoader(
+    dataset=normal_dataset,
+    batch_size=16,
+    num_workers=16,
+    shuffle=True,
+)
 
 test_dataloader = DataLoader(
     dataset=ImageFolder(root=args.test_folder, transform=img_transforms),
@@ -65,14 +96,19 @@ test_iter = iter(test_dataloader)
 test_batch, _ = next(test_iter)
 
 if args.pretrain:
-    root.info('Starting pretraining')
+    root.info("Starting pretraining")
     padeep.pretrain(train_dataloader, n_epochs=args.ae_n_epochs)
-    root.info('Pretraining done')
+    root.info("Pretraining done")
 
-root.info('Starting training')
-padeep.train_home_made(train_dataloader, n_epochs=args.n_epochs, test_images=test_batch)
+root.info("Starting training")
+padeep.train(
+    train_dataloader,
+    n_epochs=args.n_epochs,
+    test_images=test_batch,
+    outlier_exposure=True,
+)
 
 results = padeep.predict(test_batch)
 
-utils.save_image(test_batch, 'inputs.png')
-utils.save_image(results, 'outputs.png')
+utils.save_image(test_batch, "inputs.png")
+utils.save_image(results, "outputs.png")
