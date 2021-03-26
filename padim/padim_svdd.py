@@ -78,9 +78,6 @@ class PaDiMSVDD(PaDiMBase):
         self.test_time = None
         self.test_scores = None
 
-    def train(self, **kwargs):
-        self.svdd.train(self.image_ad_dataset, device=self.device, **kwargs)
-
     def _embed_batch_flatten(self, imgs):
         embeddings = self._embed_batch(imgs)
         _, C, _, _ = embeddings.shape
@@ -147,11 +144,7 @@ class PaDiMSVDD(PaDiMBase):
 
         self.svdd.net.load_state_dict(net_dict)
 
-    def train_home_made(self,
-                        dataloader,
-                        n_epochs=10,
-                        test_images=None,
-                        test_cb=None):
+    def train(self, dataloader, n_epochs=10, test_images=None, test_cb=None):
         logger = logging.getLogger()
 
         self.svdd.net = self.svdd.net.to(self.device)
