@@ -12,6 +12,13 @@ The key features of this implementation are:
 - Resumable learning - the training step can be stopped and then resumed with inference in-between
 - Limited dependencies - apart from PyTorch, Torchvision and Numpy 
 
+### Variants
+
+This repository also contains variants on the original PaDiM model:
+
+- [PaDiMSDDD](https://github.com/Pangoraw/PaDiM/blob/main/padim/padim_svdd.py) uses a [Deep-SVDD](http://proceedings.mlr.press/v80/ruff18a.html) model instead of a multi-variate Gaussian distribution for the normal patch representation.
+- [PaDiMShared](https://github.com/Pangoraw/PaDiM/blob/main/padim/padim_shared.py) shares the multi-variate Gaussian distribution between all patches instead of learning it only for specific coordinates.
+
 ### Installation
 
 ```
