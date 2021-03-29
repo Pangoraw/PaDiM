@@ -100,8 +100,10 @@ class PaDiMSVDD(PaDiMBase):
         for epoch in pbar:
             loss_epoch = 0
             n_batches = 0
-            for imgs, _ in dataloader:
+            for imgs, y_true in dataloader:
                 imgs = imgs.to(self.device)
+                y_true = y_true.to(self.device)
+                imgs = imgs[y_true == 1]
 
                 optimizer.zero_grad()
 
@@ -187,6 +189,7 @@ class PaDiMSVDD(PaDiMBase):
             n_batches = 0
             for imgs, y_true in dataloader:
                 imgs = imgs.to(self.device)
+                y_true = y_true.to(self.device)
 
                 optimizer.zero_grad()
 
@@ -199,12 +202,14 @@ class PaDiMSVDD(PaDiMBase):
                         torch.max(torch.zeros_like(scores), scores))
                 else:
                     if outlier_exposure:
-                        mask = torch.zeros((imgs.size(0), 104, 104))
-                        mask[y_true == 1, :, :] = 1.0
-                        mask = mask.reshape((-1, 1))
-                        dist = mask * dist - (
-                            1 - mask) * torch.log(1 - torch.exp(-dist))
-                    loss = torch.mean(dist)
+                        mask = torch.zeros((imgs.size(0), 104 * 104), dtype=torch.bool, device=self.device)
+                        mask[y_true == 1, :] = True
+                        mask = mask.flatten()
+                        normal_loss = torch.mean(dist[mask])
+                        anomalous_loss = torch.mean(- torch.log(1 - torch.exp(-dist[~mask])))
+                        loss = normal_loss + anomalous_loss
+                    else:
+                        loss = torch.mean(dist)
 
                 loss.backward()
                 optimizer.step()
