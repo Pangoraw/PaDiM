@@ -44,3 +44,8 @@ class PaDiMBase:
             index=self.embedding_ids,
         )
         return embeddings
+
+    def _embed_batch_flatten(self, imgs):
+        embeddings = self._embed_batch(imgs)
+        _, C, _, _ = embeddings.shape
+        return embeddings.permute(0, 2, 3, 1).reshape((-1, C))

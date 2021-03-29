@@ -81,6 +81,7 @@ class PaDiM(PaDiMBase):
         =======
             means: Tensor - the computed mean vectors
             covs: Tensor - the computed covariance matrices
+            embedding_ids: Tensor - the embedding indices
         """
         means = self.means.detach().clone()
         covs = self.covs.detach().clone()

@@ -77,11 +77,6 @@ class PaDiMSVDD(PaDiMBase):
         self.test_time = None
         self.test_scores = None
 
-    def _embed_batch_flatten(self, imgs):
-        embeddings = self._embed_batch(imgs)
-        _, C, _, _ = embeddings.shape
-        return embeddings.permute(0, 2, 3, 1).reshape((-1, C))
-
     def pretrain(self, dataloader, n_epochs=10, test_cb=None):
         logger = logging.getLogger()
 
