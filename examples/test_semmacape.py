@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 
 sys.path.append('./')
 
-from padim import PaDiM
+from padim import PaDiM, PaDiMShared
 from padim.datasets import (
     LimitedDataset,
     SemmacapeTestDataset,
@@ -24,6 +24,7 @@ def get_args():
     parser.add_argument("--iou_threshold", type=float, default=0.5)
     parser.add_argument("--min_area", type=int, default=2)
     parser.add_argument("--use_nms", action="store_true")
+    parser.add_argument("--shared", action="store_true")
     return parser.parse_args()
 
 
@@ -34,13 +35,18 @@ IOU_THRESHOLD = cfg.iou_threshold
 PARAMS_PATH = cfg.params_path
 MIN_AREA = cfg.min_area
 USE_NMS = cfg.use_nms
-print(USE_NMS)
 LATTICE = 104
+SHARED = cfg.shared
+
+if SHARED:
+    Model = PaDiMShared
+else:
+    Model = PaDiM
 
 with open(PARAMS_PATH, 'rb') as f:
     params = pickle.load(f)
 
-padim = PaDiM.from_residuals(*params, device="cuda:0")
+padim = Model.from_residuals(*params, device="cuda:0")
 
 img_transforms = transforms.Compose([
     transforms.ToTensor(),

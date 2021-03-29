@@ -17,7 +17,7 @@ echo "THRESHOLD=$THRESHOLD" | tee -a $LOG_FILE
 if [ -f "$PARAMS_PATH" ]; then
   echo ">> $PARAMS_PATH already exists, skipping training"
 else
-  python examples/semmacape.py --train_limit $TRAIN_LIMIT --params_path $PARAMS_PATH \
+  python examples/semmacape.py --train_limit $TRAIN_LIMIT --params_path $PARAMS_PATH $EXTRA_FLAGS \
     | tee -a $LOG_FILE
 fi
 
@@ -28,4 +28,5 @@ python examples/test_semmacape.py \
   --params_path $PARAMS_PATH \
   --min_area $MIN_AREA \
   --use_nms \
+  $EXTRA_FLAGS \
   | tee -a $LOG_FILE

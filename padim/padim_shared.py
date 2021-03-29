@@ -6,6 +6,7 @@ from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
+from padim.backbones import ResNet18, WideResNet50
 from padim.base import PaDiMBase
 
 
@@ -14,7 +15,6 @@ class PaDiMShared(PaDiMBase):
     Like PaDiM, but the multi-variate gaussian representation is shared
     between all patches
     """
-
     def __init__(
         self,
         num_embeddings: int = 100,
@@ -58,10 +58,13 @@ class PaDiMShared(PaDiMBase):
             self.train_one_batch(imgs)
         return self.get_params()
 
-    def predict(self, new_imgs: Tensor) -> Tensor:
-        mean, cov, _ = self.get_params()
-        mean, cov = mean.cpu().numpy(), cov.cpu().numpy()
-        inv_cov = np.linalg.inv(cov)
+    def predict(self, new_imgs: Tensor, params=None) -> Tensor:
+        if params is None:
+            mean, cov, _ = self.get_params()
+            mean, cov = mean.cpu().numpy(), cov.cpu().numpy()
+            inv_cov = np.linalg.inv(cov)
+        else:
+            mean, inv_cov = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
         embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
@@ -98,3 +101,29 @@ class PaDiMShared(PaDiMBase):
         cov += epsilon * identity
 
         return mean, cov, self.embedding_ids
+
+    def get_residuals(self):
+        if isinstance(self.model, ResNet18):
+            backbone = "resnet18"
+        elif isinstance(self.model, WideResNet50):
+            backbone = "wide_resnet50"
+        else:
+            raise NotImplementedError()
+
+        def detach_numpy(t: Tensor):
+            return t.detach().cpu().numpy()
+
+        return (self.N, detach_numpy(self.mean), detach_numpy(self.cov),
+                detach_numpy(self.embedding_ids), backbone)
+
+    @staticmethod
+    def from_residuals(N: int, mean, cov, embedding_ids, backbone, device):
+        num_embeddings, = embedding_ids.shape
+        padim = PaDiMShared(num_embeddings=num_embeddings,
+                            backbone=backbone,
+                            device=device)
+        padim.embedding_ids = torch.tensor(embedding_ids, device=device)
+        padim.N = N
+        padim.mean = torch.tensor(mean, device=device)
+        padim.cov = torch.tensor(cov, device=device)
+        return padim

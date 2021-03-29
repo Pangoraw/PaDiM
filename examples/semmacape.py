@@ -9,8 +9,9 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset
 
 sys.path.append('./')
+sys.path.append('./deep_svdd/src/')
 
-from padim import PaDiM
+from padim import PaDiM, PaDiMShared
 from padim.datasets import LimitedDataset
 
 
@@ -42,6 +43,7 @@ def get_args():
     parser = argparse.ArgumentParser(prog="PaDiM trainer")
     parser.add_argument("--train_limit", type=int, default=-1)
     parser.add_argument("--params_path", type=str)
+    parser.add_argument("--shared", action="store_true")
     return parser.parse_args()
 
 
@@ -49,8 +51,14 @@ cfg = get_args()
 LIMIT = cfg.train_limit
 PARAMS_PATH = cfg.params_path
 LATTICE = 104
+SHARED = cfg.shared
 
-padim = PaDiM(device="cuda:0", backbone="wide_resnet50")
+if SHARED:
+    Model = PaDiMShared
+else:
+    Model = PaDiM
+
+padim = Model(device="cuda:0", backbone="wide_resnet50")
 img_transforms = transforms.Compose([
     transforms.ToTensor(),
     transforms.Resize((416, 416)),
