@@ -81,17 +81,17 @@ inv_cvars = padim._get_inv_cvars(covs)
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
     res = padim.predict(img, params=(means, inv_cvars))
-    print(res.shape)
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE))
 
     def normalize_box(box):
-        x1, y1, x2, y2 = box
+        x1, y1, x2, y2, s = box
         return (
             x1 / LATTICE,
             y1 / LATTICE,
             abs(x1 - x2) / LATTICE,
-            abs(y1 - y2) / LATTICE
+            abs(y1 - y2) / LATTICE,
+            s
         )
     preds = propose_regions(
         res,
@@ -154,7 +154,7 @@ for loc, img, mask in tqdm(test_dataloader):
                     classes[cls][3]
                 )
                 box_detected = True
-            x2, y2, w2, h2 = pred
+            x2, y2, w2, h2, = pred[:4]
             # check inclusion
             if (x2 >= x1
                     and x2 + w2 <= x1 + w
