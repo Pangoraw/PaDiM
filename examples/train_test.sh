@@ -17,8 +17,23 @@ echo "THRESHOLD=$THRESHOLD" | tee -a $LOG_FILE
 if [ -f "$PARAMS_PATH" ]; then
   echo ">> $PARAMS_PATH already exists, skipping training"
 else
-  python examples/semmacape.py --train_limit $TRAIN_LIMIT --params_path $PARAMS_PATH $EXTRA_FLAGS \
-    | tee -a $LOG_FILE
+	# We want to use the Deep-SVDD version
+	if [[ "$PADEEP" == "1" ]]; then
+		python examples/padeep.py \
+			--train_folder ./data/semmacape/ \
+			--test_folder ./data_semmacape \
+			--oe_folder ./data/coco/ \
+			--oe_frequency 2 \
+			--n_epochs $N_EPOCHS \
+			--ae_n_epochs $AE_N_EPOCHS \
+			--pretrain \
+			--train_limit $TRAIN_LIMIT \
+			--params_path $PARAMS_PATH \
+			| tee -a $LOG_FILE
+	else # Use the regular PaDiM version
+		python examples/semmacape.py --train_limit $TRAIN_LIMIT --params_path $PARAMS_PATH $EXTRA_FLAGS \
+			| tee -a $LOG_FILE
+	fi
 fi
 
 python examples/test_semmacape.py \

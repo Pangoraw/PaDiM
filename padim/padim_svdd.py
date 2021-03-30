@@ -281,6 +281,18 @@ class PaDiMSVDD(PaDiMBase):
         # Return anomaly maps
         return scores.reshape((-1, 1, 104, 104))
 
+    def get_params(self):
+        """
+        Returns placeholders for the mean and covariance
+        """
+        return torch.zeros((1,)), torch.zeros((1, 1)), self.embedding_ids
+
+    def _get_inv_cvars(self, a):
+        """
+        Noop, like `get_params()`
+        """
+        return a
+
     def get_residuals(self):
         def detach_numpy(t: Tensor):
             return t.detach().cpu().numpy()

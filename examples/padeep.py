@@ -1,11 +1,12 @@
 import argparse
 import logging
+import pickle
 import sys
 
 import torch
-from torch.utils.data import DataLoader, Dataset
-from torchvision.datasets import ImageFolder, CIFAR10
-from torchvision import transforms, utils
+from torch.utils.data import DataLoader
+from torchvision.datasets import ImageFolder
+from torchvision import transforms
 
 sys.path.append("../padim")
 sys.path.append("../deep_svdd/src")
@@ -22,6 +23,7 @@ root.addHandler(handler)
 parser = argparse.ArgumentParser(prog="PaDeep test")
 parser.add_argument("--train_folder", required=True)
 parser.add_argument("--test_folder", required=True)
+parser.add_argument("--params_path", required=True)
 parser.add_argument("--oe_folder")
 parser.add_argument("--oe_frequency", type=int)
 parser.add_argument("--n_epochs", type=int, default=1)
@@ -30,6 +32,7 @@ parser.add_argument("--train_limit", type=int, default=-1)
 parser.add_argument("--pretrain", action="store_true")
 
 args = parser.parse_args()
+PARAMS_PATH = args.params_path
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -96,7 +99,9 @@ padeep.train(
     outlier_exposure=True,
 )
 
-results = padeep.predict(test_batch)
+print(">> Saving params")
+params = padeep.get_residuals()
+with open(PARAMS_PATH, 'wb') as f:
+    pickle.dump(params, f)
+print(f">> Params saved at {PARAMS_PATH}")
 
-utils.save_image(test_batch, "inputs.png")
-utils.save_image(results, "outputs.png")
