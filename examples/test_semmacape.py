@@ -81,7 +81,6 @@ inv_cvars = padim._get_inv_cvars(covs)
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
     res = padim.predict(img, params=(means, inv_cvars))
-    print(res.shape)
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE))
 
