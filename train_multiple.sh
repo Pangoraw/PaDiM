@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-CONFIG_FILE=config_without_threshold.env
+CONFIG_FILE=./configs/config_without_threshold.env
 
 for THRESHOLD_VALUE in 3 4 5 6 7 8 9
 do

@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-CONFIG_FILE=${1-config.env}
+CONFIG_FILE=${1-./configs/config.env}
 
 set -o allexport
 source $CONFIG_FILE
