@@ -8,7 +8,6 @@ from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
-from padim.backbones import ResNet18, WideResNet50
 from padim.base import PaDiMBase
 
 
@@ -166,12 +165,7 @@ class PaDiM(PaDiMBase):
             covs: Tensor - the sums of the outer product of embedding vectors
             embedding_ids: Tensor - random dimensions used for size reduction
         """
-        if isinstance(self.model, ResNet18):
-            backbone = "resnet18"
-        elif isinstance(self.model, WideResNet50):
-            backbone = "wide_resnet50"
-        else:
-            raise NotImplementedError()
+        backbone = self._get_backbone()
 
         def detach_numpy(t: Tensor) -> NDArray:
             return t.detach().cpu().numpy()

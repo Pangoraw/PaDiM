@@ -20,6 +20,16 @@ class PaDiMBase:
         self.embedding_ids = torch.randperm(
             self.max_embeddings_size)[:self.num_embeddings].to(self.device)
 
+    def _get_backbone(self):
+        if isinstance(self.model, ResNet18):
+            backbone = "resnet18"
+        elif isinstance(self.model, WideResNet50):
+            backbone = "wide_resnet50"
+        else:
+            raise NotImplementedError()
+
+        return backbone
+
     def _init_backbone(self, backbone: str) -> None:
         if backbone == "resnet18":
             self.model = ResNet18().to(self.device)

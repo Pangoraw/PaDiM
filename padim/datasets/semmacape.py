@@ -10,6 +10,31 @@ from torch import Tensor
 from torch.utils.data import Dataset
 
 
+class OutlierExposureDataset(Dataset):
+    def __init__(self, normal_dataset, outlier_dataset, frequency=2):
+        self.frequency = frequency
+        self.normal_dataset = normal_dataset
+        self.normal_dataset_idx = 0
+        self.outlier_dataset = outlier_dataset
+        self.outlier_dataset_idx = 0
+
+    def __getitem__(self, index):
+        cls = 1 - int((index % self.frequency) == 1)
+        if cls == 1:
+            dataset = self.normal_dataset
+            idx = self.normal_dataset_idx
+            self.normal_dataset_idx += 1
+        else:
+            dataset = self.outlier_dataset
+            idx = self.outlier_dataset_idx
+            self.outlier_dataset_idx += 1
+        img, _ = dataset[idx]
+        return img, cls
+
+    def __len__(self):
+        return min(len(self.outlier_dataset), len(self.normal_dataset))
+
+
 class LimitedDataset(Dataset):
     """
     Limits the underlying Dataset to only N samples

@@ -23,6 +23,7 @@ class PaDiMSVDD(PaDiMBase):
     """A variant of the PaDiM architecture using Deep-SVDD as
     the normal distribution instead of a multi-variate gaussian
     """
+
     def __init__(
         self,
         num_embeddings: int = 100,
@@ -202,11 +203,14 @@ class PaDiMSVDD(PaDiMBase):
                         torch.max(torch.zeros_like(scores), scores))
                 else:
                     if outlier_exposure:
-                        mask = torch.zeros((imgs.size(0), 104 * 104), dtype=torch.bool, device=self.device)
+                        mask = torch.zeros((imgs.size(0), 104 * 104),
+                                           dtype=torch.bool,
+                                           device=self.device)
                         mask[y_true == 1, :] = True
                         mask = mask.flatten()
                         normal_loss = torch.mean(dist[mask])
-                        anomalous_loss = torch.mean(- torch.log(1 - torch.exp(-dist[~mask])))
+                        anomalous_loss = torch.mean(
+                            -torch.log(1 - torch.exp(-dist[~mask])))
                         loss = normal_loss + anomalous_loss
                     else:
                         loss = torch.mean(dist)
@@ -263,7 +267,7 @@ class PaDiMSVDD(PaDiMBase):
 
         return c
 
-    def predict(self, batch: Tensor):
+    def predict(self, batch: Tensor, _=None):
         self.svdd.net.eval()
 
         embeddings = self._embed_batch_flatten(batch)
@@ -276,3 +280,28 @@ class PaDiMSVDD(PaDiMBase):
 
         # Return anomaly maps
         return scores.reshape((-1, 1, 104, 104))
+
+    def get_residuals(self):
+        def detach_numpy(t: Tensor):
+            return t.detach().cpu().numpy()
+
+        backbone = self._get_backbone()
+        net_dict = self.svdd.net.state_dict()
+        objective = self.objective
+        c, R = self.c, self.R
+        return net_dict, objective, c, R, detach_numpy(
+            self.embedding_ids), backbone
+
+    @staticmethod
+    def from_residuals(net_dict, objective, c, R, embedding_ids, backbone,
+                       device):
+        num_embeddings, = embedding_ids.shape
+        padim = PaDiMSVDD(num_embeddings=num_embeddings,
+                          backbone=backbone,
+                          device=device,
+                          R=R)
+        padim.embedding_ids = torch.tensor(embedding_ids, device=device)
+        padim.R = R
+        padim.c = torch.tensor(c, device=device)
+
+        return padim
