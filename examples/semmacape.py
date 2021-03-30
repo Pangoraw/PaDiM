@@ -71,7 +71,7 @@ dataloader = DataLoader(
     batch_size=32,
     num_workers=4,
     dataset=LimitedDataset(limit=LIMIT, dataset=TrainingDataset(
-        data_dir="/share/home/berg/scripts/416_empty/",
+        data_dir="./data/semmacape/416_empty/",
         img_transforms=img_transforms,
     )),
 )

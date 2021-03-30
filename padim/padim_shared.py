@@ -102,6 +102,9 @@ class PaDiMShared(PaDiMBase):
 
         return mean, cov, self.embedding_ids
 
+    def _get_inv_cvars(self, cov):
+        return np.linalg.inv(cov)
+
     def get_residuals(self):
         if isinstance(self.model, ResNet18):
             backbone = "resnet18"
