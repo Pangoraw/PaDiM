@@ -15,6 +15,7 @@ class PaDiMShared(PaDiMBase):
     Like PaDiM, but the multi-variate gaussian representation is shared
     between all patches
     """
+
     def __init__(
         self,
         num_embeddings: int = 100,
