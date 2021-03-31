@@ -68,7 +68,7 @@ train_dataloader = DataLoader(
     dataset=train_dataset,
     batch_size=16,
     num_workers=16,
-    shuffle=True,
+    shuffle=False,
 )
 
 train_normal_dataloader = DataLoader(

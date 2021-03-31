@@ -23,7 +23,7 @@ else
 			--train_folder ./data/semmacape/ \
 			--test_folder ./data/semmacape \
 			--oe_folder ./data/coco/ \
-			--oe_frequency 2 \
+			--oe_frequency $OE_FREQUENCY \
 			--n_epochs $N_EPOCHS \
 			--ae_n_epochs $AE_N_EPOCHS \
 			--pretrain \
