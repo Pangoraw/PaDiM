@@ -19,9 +19,9 @@ if [ -f "$PARAMS_PATH" ]; then
 else
 	# We want to use the Deep-SVDD version
 	if [[ "$PADEEP" == "1" ]]; then
-		python examples/padeep.py \
+		PYTHONPATH=deep_svdd/src/ python examples/padeep.py \
 			--train_folder ./data/semmacape/ \
-			--test_folder ./data_semmacape \
+			--test_folder ./data/semmacape \
 			--oe_folder ./data/coco/ \
 			--oe_frequency 2 \
 			--n_epochs $N_EPOCHS \
@@ -43,5 +43,5 @@ python examples/test_semmacape.py \
   --params_path $PARAMS_PATH \
   --min_area $MIN_AREA \
   --use_nms \
-  $EXTRA_FLAGS \
+  ${EXTRA_FLAGS-} \
   | tee -a $LOG_FILE

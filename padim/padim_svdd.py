@@ -267,11 +267,12 @@ class PaDiMSVDD(PaDiMBase):
 
         return c
 
-    def predict(self, batch: Tensor, _=None):
+    def predict(self, batch: Tensor, params=None):
         self.svdd.net.eval()
 
-        embeddings = self._embed_batch_flatten(batch)
-        outputs = self.svdd.net(embeddings)
+        with torch.no_grad():
+            embeddings = self._embed_batch_flatten(batch)
+            outputs = self.svdd.net(embeddings)
         dists = torch.sum((outputs - self.c)**2, dim=1)
         if self.objective == 'soft-boundary':
             scores = dists - self.R**2
@@ -279,7 +280,7 @@ class PaDiMSVDD(PaDiMBase):
             scores = dists
 
         # Return anomaly maps
-        return scores.reshape((-1, 1, 104, 104))
+        return scores.reshape((-1, 1, 104, 104)).detach().cpu().numpy()
 
     def get_params(self):
         """
@@ -312,6 +313,8 @@ class PaDiMSVDD(PaDiMBase):
                           backbone=backbone,
                           device=device,
                           R=R)
+        padim.svdd.net.load_state_dict(net_dict)
+        padim.svdd.net = padim.svdd.net.to(device)
         padim.embedding_ids = torch.tensor(embedding_ids, device=device)
         padim.R = R
         padim.c = torch.tensor(c, device=device)

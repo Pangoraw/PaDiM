@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 sys.path.append('./')
 sys.path.append('./deep_svdd/src/')
 
-from padim import PaDiM, PaDiMShared
+from padim import PaDiM, PaDiMShared, PaDiMSVDD
 from padim.datasets import (
     LimitedDataset,
     SemmacapeTestDataset,
@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument("--min_area", type=int, default=2)
     parser.add_argument("--use_nms", action="store_true")
     parser.add_argument("--shared", action="store_true")
+    parser.add_argument("--deep", action="store_true")
     return parser.parse_args()
 
 
@@ -38,8 +39,11 @@ MIN_AREA = cfg.min_area
 USE_NMS = cfg.use_nms
 LATTICE = 104
 SHARED = cfg.shared
+DEEP = cfg.deep
 
-if SHARED:
+if DEEP:
+    Model = PaDiMSVDD
+elif SHARED:
     Model = PaDiMShared
 else:
     Model = PaDiM
@@ -166,7 +170,10 @@ print(f"positive proposals: {positive_proposals}")
 print(f"total positive proposals: {total_positive_proposals}")
 print(f"total proposals: {n_proposals}")
 print(f"included: {n_included}")
-print(f"PPR: {positive_proposals / n_proposals}")
+if n_proposals == 0:
+    print(f"PPR: 0")
+else:
+    print(f"PPR: {positive_proposals / n_proposals}")
 print(f"RECALL: {positive_proposals / n_gt}")
 print(f"MEAN_IOU: {sum_iou / n_proposals}")
 for cls, (detected, n_cls_proposals, cls_sum_iou, n_cls_gt) in classes.items():

@@ -57,7 +57,7 @@ normal_dataset = LimitedDataset(
 if args.oe_folder is not None:
     train_dataset = OutlierExposureDataset(
         normal_dataset=normal_dataset,
-        outlier_dataset=ImageFolder(root=arg.oe_folder,
+        outlier_dataset=ImageFolder(root=args.oe_folder,
                                     transform=img_transforms),
         frequency=args.oe_frequency,
     )
@@ -78,14 +78,6 @@ train_normal_dataloader = DataLoader(
     shuffle=True,
 )
 
-test_dataloader = DataLoader(
-    dataset=ImageFolder(root=args.test_folder, transform=img_transforms),
-    batch_size=4,
-    shuffle=True,
-)
-test_iter = iter(test_dataloader)
-test_batch, _ = next(test_iter)
-
 if args.pretrain:
     root.info("Starting pretraining")
     padeep.pretrain(train_dataloader, n_epochs=args.ae_n_epochs)
@@ -95,7 +87,6 @@ root.info("Starting training")
 padeep.train(
     train_dataloader,
     n_epochs=args.n_epochs,
-    test_images=test_batch,
     outlier_exposure=True,
 )
 
