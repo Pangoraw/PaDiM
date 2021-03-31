@@ -85,7 +85,7 @@ for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
     res = padim.predict(img, params=(means, inv_cvars))
     res = (res - res.min()) / (res.max() - res.min())
-    res = res.reshape((LATTICE, LATTICE))
+    res = res.reshape((LATTICE, LATTICE)).cpu()
 
     def normalize_box(box):
         x1, y1, x2, y2, s = box

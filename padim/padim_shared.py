@@ -61,21 +61,15 @@ class PaDiMShared(PaDiMBase):
     def predict(self, new_imgs: Tensor, params=None) -> Tensor:
         if params is None:
             mean, cov, _ = self.get_params()
-            inv_cov = torch.linalg.inv(cov)
+            inv_cov = torch.inverse(cov)
         else:
             mean, inv_cov = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h)
-
-        distances = []
-        for i in range(h * w):
-            distance = [
-                mahalanobis_sq(e[:, i], mean, inv_cov) for e in embeddings
-            ]
-            distances.append(distance)
-
-        return np.array(distances)
+        assert b == 1, f"batch size should be 1, got {b}"
+        embeddings = embeddings.reshape(c, w * h).permute(1, 0)
+        distances = mahalanobis_sq(embeddings, mean, inv_cov)
+        return distances
 
     def get_params(self, epsilon: float = 0.01):
         """
@@ -102,7 +96,7 @@ class PaDiMShared(PaDiMBase):
         return mean, cov, self.embedding_ids
 
     def _get_inv_cvars(self, cov):
-        return torch.linalg.inv(cov)
+        return torch.inverse(cov)
 
     def get_residuals(self):
         def detach_numpy(t: Tensor):

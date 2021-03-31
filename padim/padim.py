@@ -6,6 +6,7 @@ from numpy import ndarray as NDArray
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
+from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
 from padim.utils.distance import mahalanobis_sq
@@ -115,21 +116,21 @@ class PaDiM(PaDiMBase):
         return np.array(distances)
 
     def _get_inv_cvars(self, covs: Tensor) -> NDArray:
-        inv_cvars = torch.linalg.inv(covs)
+        inv_cvars = torch.inverse(covs)
         return inv_cvars
 
     def predict(self,
                 new_imgs: Tensor,
-                params: Tuple[NDArray, NDArray] = None) -> NDArray:
+                params: Tuple[Tensor, Tensor] = None) -> Tensor:
         """
         Computes the distance matrix for each image * patch
         Params
         ======
             imgs: Tensor - (b * W * H) tensor of images
-            params: [(ndarray, ndarray)] - optional precomputed parameters
+            params: [(Tensor, Tensor)] - optional precomputed parameters
         Returns
         =======
-            distances: ndarray - (c * b) array of distances
+            distances: Tensor - (c * b) array of distances
         """
         if params is None:
             means, covs, _ = self.get_params()
@@ -138,18 +139,12 @@ class PaDiM(PaDiMBase):
             means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h)
+        # not required, but need changing of testing code
+        assert b == 1, f"The batch should be of size 1, got b={b}"
+        embeddings = embeddings.reshape(c, w * h).permute(1, 0)
 
-        distances = []
-        for i in range(h * w):
-            mean = means[i, :]
-            cvar_inv = inv_cvars[i, :, :]
-            distance = [
-                mahalanobis_sq(e[:, i], mean, cvar_inv) for e in embeddings
-            ]
-            distances.append(distance)
-
-        return np.array(distances)
+        distances = mahalanobis_sq(embeddings, means, inv_cvars)
+        return distances
 
     def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:
         """
