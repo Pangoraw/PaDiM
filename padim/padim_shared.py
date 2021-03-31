@@ -61,7 +61,7 @@ class PaDiMShared(PaDiMBase):
     def predict(self, new_imgs: Tensor, params=None) -> Tensor:
         if params is None:
             mean, cov, _ = self.get_params()
-            inv_cov = torch.linalg.inv(cov)
+            inv_cov = torch.inverse(cov)
         else:
             mean, inv_cov = params
         embeddings = self._embed_batch(new_imgs)

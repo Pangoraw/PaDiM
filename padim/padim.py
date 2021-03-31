@@ -155,7 +155,7 @@ class PaDiM(PaDiMBase):
         distances = torch.tensor(distances)
         print("equal? = ", torch.all(other_distances.to('cpu') == distances**2))
 
-        return np.array(distances)
+        return np.array(other_distances)
 
     def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:
         """
