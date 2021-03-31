@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
-from padim.utils.distance import batch_mahalanobis_sq, mahalanobis_sq
+from padim.utils.distance import mahalanobis_sq
 
 
 class PaDiM(PaDiMBase):
@@ -139,23 +139,12 @@ class PaDiM(PaDiMBase):
             means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
+        # not required, but need changing of testing code
         assert b == 1, f"The batch should be of size 1, got b={b}"
-        np_embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
         embeddings = embeddings.reshape(c, w * h).permute(1, 0)
 
-        distances = []
-        other_distances = mahalanobis_sq(embeddings, means, inv_cvars)
-        for i in range(h * w):
-            mean = means[i, :].cpu().numpy()
-            cvar_inv = inv_cvars[i, :, :].cpu().numpy()
-            distance = [
-                mahalanobis(e[:, i], mean, cvar_inv) for e in np_embeddings
-            ]
-            distances.append(distance)
-        distances = torch.tensor(distances)
-        print("equal? = ", torch.all(other_distances.to('cpu') == distances**2))
-
-        return np.array(other_distances)
+        distances = mahalanobis_sq(embeddings, means, inv_cvars)
+        return distances
 
     def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:
         """

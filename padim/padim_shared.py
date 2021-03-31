@@ -66,16 +66,10 @@ class PaDiMShared(PaDiMBase):
             mean, inv_cov = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h)
-
-        distances = []
-        for i in range(h * w):
-            distance = [
-                mahalanobis_sq(e[:, i], mean, inv_cov) for e in embeddings
-            ]
-            distances.append(distance)
-
-        return np.array(distances)
+        assert b == 1, f"batch size should be 1, got {b}"
+        embeddings = embeddings.reshape(c, w * h).permute(1, 0)
+        distances = mahalanobis_sq(embeddings, mean, inv_cov)
+        return distances
 
     def get_params(self, epsilon: float = 0.01):
         """
