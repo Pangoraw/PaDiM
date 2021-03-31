@@ -80,7 +80,6 @@ total_positive_proposals = 0
 positive_proposals = 0
 
 means, covs, _ = padim.get_params()
-means, covs = means.cpu().numpy(), covs.cpu().numpy()
 inv_cvars = padim._get_inv_cvars(covs)
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction

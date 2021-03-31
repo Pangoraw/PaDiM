@@ -18,7 +18,7 @@ if [ -f "$PARAMS_PATH" ]; then
   echo ">> $PARAMS_PATH already exists, skipping training"
 else
 	# We want to use the Deep-SVDD version
-	if [[ "$PADEEP" == "1" ]]; then
+	if [[ "${PADEEP-0}" == "1" ]]; then
 		PYTHONPATH=deep_svdd/src/ python examples/padeep.py \
 			--train_folder ./data/semmacape/ \
 			--test_folder ./data/semmacape \

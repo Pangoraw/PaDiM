@@ -4,9 +4,9 @@ import numpy as np
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
-from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
+from padim.utils.distance import mahalanobis_sq
 
 
 class PaDiMShared(PaDiMBase):
@@ -61,18 +61,17 @@ class PaDiMShared(PaDiMBase):
     def predict(self, new_imgs: Tensor, params=None) -> Tensor:
         if params is None:
             mean, cov, _ = self.get_params()
-            mean, cov = mean.cpu().numpy(), cov.cpu().numpy()
-            inv_cov = np.linalg.inv(cov)
+            inv_cov = torch.linalg.inv(cov)
         else:
             mean, inv_cov = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
+        embeddings = embeddings.reshape(b, c, w * h)
 
         distances = []
         for i in range(h * w):
             distance = [
-                mahalanobis(e[:, i], mean, inv_cov) for e in embeddings
+                mahalanobis_sq(e[:, i], mean, inv_cov) for e in embeddings
             ]
             distances.append(distance)
 
@@ -103,7 +102,7 @@ class PaDiMShared(PaDiMBase):
         return mean, cov, self.embedding_ids
 
     def _get_inv_cvars(self, cov):
-        return np.linalg.inv(cov)
+        return torch.linalg.inv(cov)
 
     def get_residuals(self):
         def detach_numpy(t: Tensor):

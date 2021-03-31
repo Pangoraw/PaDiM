@@ -6,9 +6,9 @@ from numpy import ndarray as NDArray
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
-from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
+from padim.utils.distance import mahalanobis_sq
 
 
 class PaDiM(PaDiMBase):
@@ -25,9 +25,9 @@ class PaDiM(PaDiMBase):
         super(PaDiM, self).__init__(num_embeddings, device, backbone)
         self.N = 0
         self.means = torch.zeros(
-            (self.num_embeddings, self.num_patches)).to(self.device)
-        self.covs = torch.zeros((self.num_embeddings, self.num_embeddings,
-                                 self.num_patches)).to(self.device)
+            (self.num_patches, self.num_embeddings)).to(self.device)
+        self.covs = torch.zeros((self.num_patches, self.num_embeddings,
+                                 self.num_embeddings)).to(self.device)
 
     def train_one_batch(self, imgs: Tensor) -> None:
         """
@@ -45,10 +45,10 @@ class PaDiM(PaDiMBase):
             for i in range(self.num_patches):
                 patch_embeddings = embeddings[:, :, i]  # b * c
                 for j in range(b):
-                    self.covs[:, :, i] += torch.outer(
+                    self.covs[i, :, :] += torch.outer(
                         patch_embeddings[j, :],
                         patch_embeddings[j, :])  # c * c
-                self.means[:, i] += patch_embeddings.sum(dim=0)  # c
+                self.means[i, :] += patch_embeddings.sum(dim=0)  # c
             self.N += b  # number of images
 
     def train(self, dataloader: DataLoader) -> Tuple[Tensor, Tensor, Tensor]:
@@ -88,9 +88,9 @@ class PaDiM(PaDiMBase):
         identity = torch.eye(self.num_embeddings).to(self.device)
         means /= self.N
         for i in range(self.num_patches):
-            covs[:, :, i] -= self.N * torch.outer(means[:, i], means[:, i])
-            covs[:, :, i] /= self.N - 1  # corrected covariance
-            covs[:, :, i] += epsilon * identity  # constant term
+            covs[i, :, :] -= self.N * torch.outer(means[i, :], means[i, :])
+            covs[i, :, :] /= self.N - 1  # corrected covariance
+            covs[i, :, :] += epsilon * identity  # constant term
 
         return means, covs, self.embedding_ids
 
@@ -114,11 +114,8 @@ class PaDiM(PaDiMBase):
             distances.extend(new_distances)
         return np.array(distances)
 
-    def _get_inv_cvars(self, covs: NDArray) -> NDArray:
-        c, _, n = covs.shape
-        inv_cvars = np.zeros_like(covs)
-        for i in range(n):
-            inv_cvars[:, :, i] = np.linalg.inv(covs[:, :, i])
+    def _get_inv_cvars(self, covs: Tensor) -> NDArray:
+        inv_cvars = torch.linalg.inv(covs)
         return inv_cvars
 
     def predict(self,
@@ -136,20 +133,19 @@ class PaDiM(PaDiMBase):
         """
         if params is None:
             means, covs, _ = self.get_params()
-            means, covs = means.cpu().numpy(), covs.cpu().numpy()
             inv_cvars = self._get_inv_cvars(covs)
         else:
             means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
+        embeddings = embeddings.reshape(b, c, w * h)
 
         distances = []
         for i in range(h * w):
-            mean = means[:, i]
-            cvar_inv = inv_cvars[:, :, i]
+            mean = means[i, :]
+            cvar_inv = inv_cvars[i, :, :]
             distance = [
-                mahalanobis(e[:, i], mean, cvar_inv) for e in embeddings
+                mahalanobis_sq(e[:, i], mean, cvar_inv) for e in embeddings
             ]
             distances.append(distance)
 
