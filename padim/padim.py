@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
-from padim.utils.distance import mahalanobis_sq
+from padim.utils.distance import batch_mahalanobis_sq, mahalanobis_sq
 
 
 class PaDiM(PaDiMBase):
@@ -121,16 +121,16 @@ class PaDiM(PaDiMBase):
 
     def predict(self,
                 new_imgs: Tensor,
-                params: Tuple[NDArray, NDArray] = None) -> NDArray:
+                params: Tuple[Tensor, Tensor] = None) -> Tensor:
         """
         Computes the distance matrix for each image * patch
         Params
         ======
             imgs: Tensor - (b * W * H) tensor of images
-            params: [(ndarray, ndarray)] - optional precomputed parameters
+            params: [(Tensor, Tensor)] - optional precomputed parameters
         Returns
         =======
-            distances: ndarray - (c * b) array of distances
+            distances: Tensor - (c * b) array of distances
         """
         if params is None:
             means, covs, _ = self.get_params()
@@ -139,6 +139,7 @@ class PaDiM(PaDiMBase):
             means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
+        assert b == 1, f"The batch should be of size 1, got b={b}"
         np_embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
         embeddings = embeddings.reshape(c, w * h).permute(1, 0)
 
@@ -152,9 +153,7 @@ class PaDiM(PaDiMBase):
             ]
             distances.append(distance)
         distances = torch.tensor(distances)
-        print(distances.shape)
-        print(other_distances.shape)
-        print("equal? = ", (other_distances.to('cpu') - distances**2)) 
+        print("equal? = ", torch.all(other_distances.to('cpu') == distances**2))
 
         return np.array(distances)
 
