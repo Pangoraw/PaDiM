@@ -6,6 +6,7 @@ from numpy import ndarray as NDArray
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
+from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
 from padim.utils.distance import mahalanobis_sq
@@ -115,7 +116,7 @@ class PaDiM(PaDiMBase):
         return np.array(distances)
 
     def _get_inv_cvars(self, covs: Tensor) -> NDArray:
-        inv_cvars = torch.linalg.inv(covs)
+        inv_cvars = torch.inverse(covs)
         return inv_cvars
 
     def predict(self,
@@ -138,16 +139,22 @@ class PaDiM(PaDiMBase):
             means, inv_cvars = params
         embeddings = self._embed_batch(new_imgs)
         b, c, w, h = embeddings.shape
-        embeddings = embeddings.reshape(b, c, w * h)
+        np_embeddings = embeddings.reshape(b, c, w * h).cpu().numpy()
+        embeddings = embeddings.reshape(c, w * h).permute(1, 0)
 
         distances = []
+        other_distances = mahalanobis_sq(embeddings, means, inv_cvars)
         for i in range(h * w):
-            mean = means[i, :]
-            cvar_inv = inv_cvars[i, :, :]
+            mean = means[i, :].cpu().numpy()
+            cvar_inv = inv_cvars[i, :, :].cpu().numpy()
             distance = [
-                mahalanobis_sq(e[:, i], mean, cvar_inv) for e in embeddings
+                mahalanobis(e[:, i], mean, cvar_inv) for e in np_embeddings
             ]
             distances.append(distance)
+        distances = torch.tensor(distances)
+        print(distances.shape)
+        print(other_distances.shape)
+        print("equal? = ", (other_distances.to('cpu') - distances**2)) 
 
         return np.array(distances)
 

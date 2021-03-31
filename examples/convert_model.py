@@ -2,11 +2,13 @@ import sys
 import pickle
 
 sys.path.append('./')
+sys.path.append('./deep_svdd/src/')
 
 from padim import PaDiM
 
+PARAMS_PATH = sys.argv[1]
 
-PARAMS_PATH = sys.argv[0]
+print(f"Converting {PARAMS_PATH}")
 
 with open(PARAMS_PATH, 'rb') as f:
     params = pickle.load(f)

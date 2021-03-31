@@ -102,7 +102,7 @@ class PaDiMShared(PaDiMBase):
         return mean, cov, self.embedding_ids
 
     def _get_inv_cvars(self, cov):
-        return torch.linalg.inv(cov)
+        return torch.inverse(cov)
 
     def get_residuals(self):
         def detach_numpy(t: Tensor):
