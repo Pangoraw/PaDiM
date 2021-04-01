@@ -7,7 +7,6 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 sys.path.append('./')
-sys.path.append('./deep_svdd/src/')
 
 from padim import PaDiM, PaDiMShared, PaDiMSVDD
 from padim.datasets import (

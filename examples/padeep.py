@@ -9,7 +9,6 @@ from torchvision.datasets import ImageFolder
 from torchvision import transforms
 
 sys.path.append("../padim")
-sys.path.append("../deep_svdd/src")
 
 from padim.datasets import LimitedDataset, OutlierExposureDataset
 from padim import PaDiMSVDD

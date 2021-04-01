@@ -8,9 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import utils as visionutils
 from tqdm import tqdm
 
-from deep_svdd.src.deepSVDD import DeepSVDD
-from deep_svdd.src.networks import build_network, build_autoencoder
-
+from padim.deep_svdd import build_network, build_autoencoder
 from padim.base import PaDiMBase
 
 
@@ -32,14 +30,13 @@ class PaDiMSVDD(PaDiMBase):
         **kwargs,
     ):
         super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
-        self.svdd = DeepSVDD()
         self._init_params(**kwargs)
 
-        self.svdd.net_name = "MLPNet"
-        self.svdd.net = build_network("MLPNet",
-                                      input_size=self.num_embeddings,
-                                      rep_dim=self.rep_dim,
-                                      features_e=self.features_e)
+        self.net_name = "MLPNet"
+        self.net = build_network("MLPNet",
+                                 input_size=self.num_embeddings,
+                                 rep_dim=self.rep_dim,
+                                 features_e=self.features_e)
 
     def _init_params(self,
                      objective='one-class',
@@ -56,7 +53,10 @@ class PaDiMSVDD(PaDiMBase):
         ), "Objective must be either 'one-class' or 'soft-boundary'."
         self.objective = objective
 
-        self.R = torch.tensor(R, device=self.device)
+        if isinstance(R, Tensor):
+            self.R = R.clone().to(self.device)
+        else:
+            self.R = torch.tensor(R, device=self.device)
         self.c = None
 
         self.features_e = features_e
@@ -133,13 +133,13 @@ class PaDiMSVDD(PaDiMBase):
                 with torch.no_grad():
                     test_cb(ae_net, epoch)
                 ae_net.train()
-        net_dict = self.svdd.net.state_dict()
+        net_dict = self.net.state_dict()
         ae_dict = ae_net.state_dict()
 
         ae_net_dict = {k: v for k, v in ae_dict.items() if k in net_dict}
         net_dict.update(ae_net_dict)
 
-        self.svdd.net.load_state_dict(net_dict)
+        self.net.load_state_dict(net_dict)
 
     def train(self,
               dataloader,
@@ -149,7 +149,7 @@ class PaDiMSVDD(PaDiMBase):
               outlier_exposure=False):
         logger = logging.getLogger()
 
-        self.svdd.net = self.svdd.net.to(self.device)
+        self.net = self.net.to(self.device)
 
         loss_writer = SummaryWriter("tboard/losses")
         if test_images is not None:
@@ -168,7 +168,7 @@ class PaDiMSVDD(PaDiMBase):
                 pass
 
         # Set optimizer (Adam optimizer for now)
-        optimizer = optim.Adam(self.svdd.net.parameters(),
+        optimizer = optim.Adam(self.net.parameters(),
                                lr=self.lr,
                                weight_decay=self.weight_decay,
                                amsgrad=self.optimizer_name == 'amsgrad')
@@ -183,7 +183,7 @@ class PaDiMSVDD(PaDiMBase):
             logger.info('Center c initialized.')
             logger.info('C is at %f' % torch.sum(self.c**2).item())
 
-        self.svdd.net.train()
+        self.net.train()
         pbar = tqdm(range(n_epochs))
         for epoch in pbar:
             loss_epoch = 0.0
@@ -195,7 +195,7 @@ class PaDiMSVDD(PaDiMBase):
                 optimizer.zero_grad()
 
                 embeddings = self._embed_batch_flatten(imgs)
-                outputs = self.svdd.net(embeddings)
+                outputs = self.net(embeddings)
                 dist = torch.sum((outputs - self.c)**2, dim=1)
                 if self.objective == 'soft-boundary':
                     scores = dist - self.R**2
@@ -240,22 +240,22 @@ class PaDiMSVDD(PaDiMBase):
             if test_cb is not None:
                 with torch.no_grad():
                     test_cb(epoch)
-                self.svdd.net.train()
+                self.net.train()
 
         logger.info('Finished training.')
 
-        return self.svdd.net
+        return self.net
 
     def _init_center_c(self, dataloader, eps=0.1):
         n_samples = 0
-        c = torch.zeros(self.svdd.net.rep_dim, device=self.device)
-        self.svdd.net.eval()
+        c = torch.zeros(self.net.rep_dim, device=self.device)
+        self.net.eval()
         with torch.no_grad():
             for inputs, _ in tqdm(dataloader):
                 inputs = inputs.to(self.device)
                 inputs = self._embed_batch_flatten(inputs)
 
-                outputs = self.svdd.net(inputs)
+                outputs = self.net(inputs)
                 n_samples += outputs.size(0)
                 c += torch.sum(outputs, dim=0)
         c /= n_samples
@@ -268,11 +268,11 @@ class PaDiMSVDD(PaDiMBase):
         return c
 
     def predict(self, batch: Tensor, params=None):
-        self.svdd.net.eval()
+        self.net.eval()
 
         with torch.no_grad():
             embeddings = self._embed_batch_flatten(batch)
-            outputs = self.svdd.net(embeddings)
+            outputs = self.net(embeddings)
         dists = torch.sum((outputs - self.c)**2, dim=1)
         if self.objective == 'soft-boundary':
             scores = dists - self.R**2
@@ -299,7 +299,7 @@ class PaDiMSVDD(PaDiMBase):
             return t.detach().cpu().numpy()
 
         backbone = self._get_backbone()
-        net_dict = self.svdd.net.state_dict()
+        net_dict = self.net.state_dict()
         objective = self.objective
         c, R = self.c, self.R
         return net_dict, objective, c, R, detach_numpy(
@@ -317,6 +317,9 @@ class PaDiMSVDD(PaDiMBase):
         padim.svdd.net = padim.svdd.net.to(device)
         padim.embedding_ids = torch.tensor(embedding_ids, device=device)
         padim.R = R
-        padim.c = torch.tensor(c, device=device)
+        if isinstance(c, Tensor):
+            padim.c = c.clone().to(device)
+        else:
+            padim.c = torch.tensor(c, device=device)
 
         return padim
