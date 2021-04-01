@@ -79,7 +79,7 @@ train_normal_dataloader = DataLoader(
 
 if args.pretrain:
     root.info("Starting pretraining")
-    padeep.pretrain(train_dataloader, n_epochs=args.ae_n_epochs)
+    padeep.pretrain(train_normal_dataloader, n_epochs=args.ae_n_epochs)
     root.info("Pretraining done")
 
 root.info("Starting training")

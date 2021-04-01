@@ -1,6 +1,5 @@
 from typing import Union
 
-import numpy as np
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
