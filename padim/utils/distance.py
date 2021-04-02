@@ -4,7 +4,8 @@ from torch import Tensor
 
 def batch_mahalanobis_sq(x: Tensor, mu: Tensor, sigma_inv: Tensor) -> Tensor:
     """
-    Allows calling `mahalanobis_sq` on a batch of tensors
+    Allows calling `mahalanobis_sq` on a batch of input tensors, for multiple
+    distributions, look at `mahalanobis_multi` instead.
     Params
     ======
         x: The input tensors of size (b, h * w, c)
@@ -35,3 +36,23 @@ def mahalanobis_sq(x: Tensor, mu: Tensor, sigma_inv: Tensor) -> Tensor:
     temp = torch.matmul(sigma_inv, delta.unsqueeze(-1))  # (h * w, c, 1)
     dist = torch.matmul(delta.unsqueeze(1), temp)  # (h * w, 1, 1)
     return dist.squeeze(1)  # (h * w, 1)
+
+
+def mahalanobis_multi(x, means, sigmas):
+    """
+    Computes the mahalanobis distance with regard to multiple distributions
+    Params
+    ======
+        x: Tensor - size (h * w, c)
+        means: Tensor - size (n, c)
+        sigmas: Tensor - size (n, c, c)
+    Returns
+    =======
+        distances: Tensor - size (n, h * w, 1)
+    """
+    n_mixtures, embeddings_size = means.shape
+    n_patches = x.size(0)
+    distances = torch.zeros((n_mixtures, n_patches, 1))
+    for i in range(n_mixtures):
+        distances[i, :, :] = mahalanobis_sq(x, means[i], sigmas[i])
+    return distances

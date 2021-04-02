@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument("--use_nms", action="store_true")
     parser.add_argument("--shared", action="store_true")
     parser.add_argument("--deep", action="store_true")
+    parser.add_argument("--compare_all", action="store_true", help="For original PaDiM only")
     return parser.parse_args()
 
 
@@ -40,10 +41,13 @@ LATTICE = 104
 SHARED = cfg.shared
 DEEP = cfg.deep
 
+predict_args = {}
+
 if DEEP:
     Model = PaDiMSVDD
 elif SHARED:
     Model = PaDiMShared
+    predict_args["compare_all"] = args.compare_all
 else:
     Model = PaDiM
 
@@ -82,7 +86,7 @@ means, covs, _ = padim.get_params()
 inv_cvars = padim._get_inv_cvars(covs)
 for loc, img, mask in tqdm(test_dataloader):
     # 1. Prediction
-    res = padim.predict(img, params=(means, inv_cvars))
+    res = padim.predict(img, params=(means, inv_cvars), **predict_args)
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE)).cpu()
 
