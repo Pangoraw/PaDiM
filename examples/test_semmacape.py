@@ -169,11 +169,12 @@ print(f"total positive proposals: {total_positive_proposals}")
 print(f"total proposals: {n_proposals}")
 print(f"included: {n_included}")
 if n_proposals == 0:
-    print(f"PPR: 0")
+    print("PPR: 0")
+    print("MEAN_IOU: 0")
 else:
     print(f"PPR: {positive_proposals / n_proposals}")
+    print(f"MEAN_IOU: {sum_iou / n_proposals}")
 print(f"RECALL: {positive_proposals / n_gt}")
-print(f"MEAN_IOU: {sum_iou / n_proposals}")
 for cls, (detected, n_cls_proposals, cls_sum_iou, n_cls_gt) in classes.items():
     print(f">> {cls}: recall: {detected / n_cls_gt}")
     if n_cls_proposals == 0:
