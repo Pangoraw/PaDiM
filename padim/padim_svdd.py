@@ -280,7 +280,7 @@ class PaDiMSVDD(PaDiMBase):
             scores = dists
 
         # Return anomaly maps
-        return scores.reshape((-1, 1, 104, 104)).detach().cpu().numpy()
+        return scores.reshape((-1, 1, 104, 104))
 
     def get_params(self):
         """
@@ -313,8 +313,8 @@ class PaDiMSVDD(PaDiMBase):
                           backbone=backbone,
                           device=device,
                           R=R)
-        padim.svdd.net.load_state_dict(net_dict)
-        padim.svdd.net = padim.svdd.net.to(device)
+        padim.net.load_state_dict(net_dict)
+        padim.net = padim.net.to(device)
         padim.embedding_ids = torch.tensor(embedding_ids, device=device)
         padim.R = R
         if isinstance(c, Tensor):

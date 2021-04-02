@@ -32,7 +32,7 @@ class OutlierExposureDataset(Dataset):
         return img, cls
 
     def __len__(self):
-        return min(len(self.outlier_dataset), len(self.normal_dataset))
+        return self.frequency * len(self.normal_dataset) // (self.frequency - 1)
 
 
 class LimitedDataset(Dataset):
