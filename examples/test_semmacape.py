@@ -173,7 +173,8 @@ for loc, img, mask in pbar:
         PPR = 0
     else:
         PPR = positive_proposals / n_proposals
-    pbar.set_description(f"PPR: {PPR:.5f}")
+    recall = positive_proposals / n_gt 
+    pbar.set_description(f"PPR: {PPR:.3f} RECALL: {recall:.3f}")
 
 print(f"positive proposals: {positive_proposals}")
 print(f"total positive proposals: {total_positive_proposals}")

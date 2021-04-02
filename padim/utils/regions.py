@@ -5,6 +5,7 @@ from itertools import product
 import cv2
 import numpy as np
 from numpy import ndarray as NDArray
+import torch
 
 
 # A box defined as (x1, y1, x2, y2)
@@ -22,6 +23,8 @@ def propose_regions_cv2(patches, threshold: float = 0.75, **kwargs):
     []
 
     """
+    if isinstance(patches, torch.Tensor):
+        patches = patches.cpu().numpy()
     mask = (patches >= threshold).astype(np.int8)
 
     _, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
