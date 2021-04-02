@@ -13,7 +13,7 @@ from padim.datasets import (
     LimitedDataset,
     SemmacapeTestDataset,
 )
-from padim.utils import propose_regions, floating_IoU
+from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 
 
 def get_args():
