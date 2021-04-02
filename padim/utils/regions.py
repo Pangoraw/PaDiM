@@ -2,12 +2,38 @@ from typing import Tuple, Union, List
 from functools import reduce
 from itertools import product
 
+import cv2
 import numpy as np
 from numpy import ndarray as NDArray
+import torch
 
 
 # A box defined as (x1, y1, x2, y2)
 Region = Tuple[int, int, int, int]
+
+
+def propose_regions_cv2(patches, threshold: float = 0.75, **kwargs):
+    """
+    Faster region proposal
+
+    >>> propose_regions_cv2(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
+    [(0, 0, 1, 2, 1), (2, 0, 3, 2, 1), (1, 2, 2, 3, 1)]
+
+    >>> propose_regions_cv2(np.array([[0, 0], [0, 0]]))
+    []
+
+    """
+    if isinstance(patches, torch.Tensor):
+        patches = patches.cpu().numpy()
+    mask = (patches >= threshold).astype(np.int8)
+
+    _, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
+    def stat_to_box(stat):
+        x1, y1, w, h, _ = stat
+        return (x1, y1, x1 + w, y1 + h, 1)
+    boxes = map(stat_to_box, stats[1:])
+
+    return filter_regions(boxes, **kwargs)
 
 
 def propose_region(

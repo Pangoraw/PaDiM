@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
-from padim.utils.distance import mahalanobis_sq
+from padim.utils.distance import mahalanobis_multi, mahalanobis_sq
 
 
 class PaDiM(PaDiMBase):
@@ -121,7 +121,8 @@ class PaDiM(PaDiMBase):
 
     def predict(self,
                 new_imgs: Tensor,
-                params: Tuple[Tensor, Tensor] = None) -> Tensor:
+                params: Tuple[Tensor, Tensor] = None,
+                compare_all: bool = False) -> Tensor:
         """
         Computes the distance matrix for each image * patch
         Params
@@ -143,7 +144,12 @@ class PaDiM(PaDiMBase):
         assert b == 1, f"The batch should be of size 1, got b={b}"
         embeddings = embeddings.reshape(c, w * h).permute(1, 0)
 
-        distances = mahalanobis_sq(embeddings, means, inv_cvars)
+        if compare_all:
+            distances = mahalanobis_multi(embeddings, means, inv_cvars)
+            print("distances.shape = ", distances.shape)
+            distances = distances.min(dim=0)
+        else:
+            distances = mahalanobis_sq(embeddings, means, inv_cvars)
         return distances
 
     def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:

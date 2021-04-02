@@ -13,7 +13,7 @@ from padim.datasets import (
     LimitedDataset,
     SemmacapeTestDataset,
 )
-from padim.utils import propose_regions, floating_IoU
+from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 
 
 def get_args():
@@ -26,6 +26,7 @@ def get_args():
     parser.add_argument("--use_nms", action="store_true")
     parser.add_argument("--shared", action="store_true")
     parser.add_argument("--deep", action="store_true")
+    parser.add_argument("--compare_all", action="store_true", help="For original PaDiM only")
     return parser.parse_args()
 
 
@@ -40,10 +41,13 @@ LATTICE = 104
 SHARED = cfg.shared
 DEEP = cfg.deep
 
+predict_args = {}
+
 if DEEP:
     Model = PaDiMSVDD
 elif SHARED:
     Model = PaDiMShared
+    predict_args["compare_all"] = args.compare_all
 else:
     Model = PaDiM
 
@@ -80,9 +84,10 @@ positive_proposals = 0
 
 means, covs, _ = padim.get_params()
 inv_cvars = padim._get_inv_cvars(covs)
-for loc, img, mask in tqdm(test_dataloader):
+pbar = tqdm(test_dataloader)
+for loc, img, mask in pbar:
     # 1. Prediction
-    res = padim.predict(img, params=(means, inv_cvars))
+    res = padim.predict(img, params=(means, inv_cvars), **predict_args)
     res = (res - res.min()) / (res.max() - res.min())
     res = res.reshape((LATTICE, LATTICE)).cpu()
 
@@ -163,6 +168,13 @@ for loc, img, mask in tqdm(test_dataloader):
                     and y2 >= y1
                     and y2 + h2 <= y1 + h):
                 n_included += 1
+
+    if n_proposals == 0:
+        PPR = 0
+    else:
+        PPR = positive_proposals / n_proposals
+    recall = positive_proposals / n_gt 
+    pbar.set_description(f"PPR: {PPR:.3f} RECALL: {recall:.3f}")
 
 print(f"positive proposals: {positive_proposals}")
 print(f"total positive proposals: {total_positive_proposals}")

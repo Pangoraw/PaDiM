@@ -7,6 +7,7 @@ from .utils import (
 from .regions import (
     propose_region,
     propose_regions,
+    propose_regions_cv2,
     IoU,
     floating_IoU,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "compute_pro_score",
     "propose_region",
     "propose_regions",
+    "propose_regions_cv2",
     "IoU",
     "floating_IoU",
 ]
