@@ -84,7 +84,8 @@ positive_proposals = 0
 
 means, covs, _ = padim.get_params()
 inv_cvars = padim._get_inv_cvars(covs)
-for loc, img, mask in tqdm(test_dataloader):
+pbar = tqdm(test_dataloader)
+for loc, img, mask in pbar:
     # 1. Prediction
     res = padim.predict(img, params=(means, inv_cvars), **predict_args)
     res = (res - res.min()) / (res.max() - res.min())
@@ -167,6 +168,12 @@ for loc, img, mask in tqdm(test_dataloader):
                     and y2 >= y1
                     and y2 + h2 <= y1 + h):
                 n_included += 1
+
+    if n_proposals == 0:
+        PPR = 0
+    else:
+        PPR = positive_proposals / n_proposals
+    pbar.set_description(f"PPR: {PPR:.5f}")
 
 print(f"positive proposals: {positive_proposals}")
 print(f"total positive proposals: {total_positive_proposals}")
