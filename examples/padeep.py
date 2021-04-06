@@ -28,6 +28,7 @@ parser.add_argument("--oe_frequency", type=int)
 parser.add_argument("--n_epochs", type=int, default=1)
 parser.add_argument("--ae_n_epochs", type=int, default=1)
 parser.add_argument("--train_limit", type=int, default=-1)
+parser.add_argument("--n_svdds", type=int, default=1)
 parser.add_argument("--pretrain", action="store_true")
 
 args = parser.parse_args()
@@ -35,7 +36,9 @@ PARAMS_PATH = args.params_path
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-padeep = PaDiMSVDD(backbone="wide_resnet50", device=device)
+padeep = PaDiMSVDD(backbone="wide_resnet50",
+                   device=device,
+                   n_svdds=args.n_svdds)
 
 img_transforms = transforms.Compose([
     transforms.ToTensor(),
@@ -48,9 +51,10 @@ img_transforms = transforms.Compose([
 ])
 
 normal_dataset = LimitedDataset(
-    ImageFolder(root=args.train_folder,
-                target_transform=lambda _: 1,  # images are always normal
-                transform=img_transforms),
+    ImageFolder(
+        root=args.train_folder,
+        target_transform=lambda _: 1,  # images are always normal
+        transform=img_transforms),
     limit=args.train_limit,
 )
 if args.oe_folder is not None:
@@ -94,4 +98,3 @@ params = padeep.get_residuals()
 with open(PARAMS_PATH, 'wb') as f:
     pickle.dump(params, f)
 print(f">> Params saved at {PARAMS_PATH}")
-

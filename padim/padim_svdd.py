@@ -8,7 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import utils as visionutils
 from tqdm import tqdm
 
-from padim.deep_svdd import build_network, build_autoencoder
+from padim.deep_svdd import build_autoencoder
+from padim.multi_svdd import MultiDeepSVDD
 from padim.base import PaDiMBase
 
 
@@ -33,7 +34,7 @@ class PaDiMSVDD(PaDiMBase):
         self._init_params(**kwargs)
 
         self.net_name = "MLPNet"
-        self.net = build_network("MLPNet",
+        self.net = MultiDeepSVDD(n_svdds=self.n_svdds,
                                  input_size=self.num_embeddings,
                                  rep_dim=self.rep_dim,
                                  features_e=self.features_e)
@@ -43,6 +44,7 @@ class PaDiMSVDD(PaDiMBase):
                      R=0.0,
                      nu=0.1,
                      features_e=16,
+                     n_svdds=1,
                      rep_dim=32,
                      lr: float = 0.001,
                      weight_decay=1e-6,
@@ -61,6 +63,7 @@ class PaDiMSVDD(PaDiMBase):
 
         self.features_e = features_e
         self.rep_dim = rep_dim
+        self.n_svdds = n_svdds
 
         self.lr = lr
         self.nu = nu
@@ -81,8 +84,7 @@ class PaDiMSVDD(PaDiMBase):
     def pretrain(self, dataloader, n_epochs=10, test_cb=None):
         logger = logging.getLogger()
 
-        ae_net = build_autoencoder('MLPNet',
-                                   input_size=self.num_embeddings,
+        ae_net = build_autoencoder(input_size=self.num_embeddings,
                                    rep_dim=self.rep_dim,
                                    features_e=self.features_e).to(self.device)
         ae_net.train()
