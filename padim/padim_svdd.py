@@ -8,8 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import utils as visionutils
 from tqdm import tqdm
 
-from padim.deep_svdd import build_autoencoder
-from padim.multi_svdd import MultiDeepSVDD
+from padim.multi_svdd import MultiDeepSVDD, MultiAutoEncoder
 from padim.base import PaDiMBase
 
 
@@ -81,16 +80,13 @@ class PaDiMSVDD(PaDiMBase):
         self.test_time = None
         self.test_scores = None
 
-    def pretrain(self, dataloader, n_epochs=10, test_cb=None):
-        logger = logging.getLogger()
-
-        ae_net = build_autoencoder(input_size=self.num_embeddings,
-                                   rep_dim=self.rep_dim,
-                                   features_e=self.features_e).to(self.device)
-        ae_net.train()
+    def pretrain(self, train_dataloader, n_epochs, *args, **kwargs):
+        multi_ae = MultiAutoEncoder(self.n_svdds, *args,
+                                    **kwargs).to(self.device)
+        multi_ae.train()
 
         # Set optimizer (Adam optimizer for now)
-        optimizer = optim.Adam(ae_net.parameters(),
+        optimizer = optim.Adam(multi_ae.parameters(),
                                lr=self.lr,
                                weight_decay=self.weight_decay,
                                amsgrad=self.optimizer_name == 'amsgrad')
@@ -103,7 +99,7 @@ class PaDiMSVDD(PaDiMBase):
         for epoch in pbar:
             loss_epoch = 0
             n_batches = 0
-            for imgs, y_true in dataloader:
+            for imgs, y_true in train_dataloader:
                 imgs = imgs.to(self.device)
                 y_true = y_true.to(self.device)
                 imgs = imgs[y_true == 1]
@@ -111,7 +107,7 @@ class PaDiMSVDD(PaDiMBase):
                 optimizer.zero_grad()
 
                 embeddings = self._embed_batch_flatten(imgs)
-                outputs = ae_net(embeddings)
+                outputs = multi_ae(embeddings)
                 scores = torch.sum((outputs - embeddings)**2,
                                    dim=tuple(range(1, outputs.dim())))
                 loss = torch.mean(scores)
@@ -125,23 +121,16 @@ class PaDiMSVDD(PaDiMBase):
             message = '\tEpoch {}/{}\t Loss: {:.8f}'.format(
                 epoch + 1, n_epochs, loss_epoch / n_batches)
             pbar.set_description(message)
-            logger.info(message)
             scheduler.step()
-            if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' %
-                            float(scheduler.get_last_lr()[0]))
-            if test_cb is not None:
-                ae_net.eval()
-                with torch.no_grad():
-                    test_cb(ae_net, epoch)
-                ae_net.train()
-        net_dict = self.net.state_dict()
-        ae_dict = ae_net.state_dict()
 
-        ae_net_dict = {k: v for k, v in ae_dict.items() if k in net_dict}
-        net_dict.update(ae_net_dict)
+        for net, ae in zip(self.net.svdds, multi_ae.auto_encoders):
+            net_dict = self.net.state_dict()
+            ae_dict = ae.state_dict()
 
-        self.net.load_state_dict(net_dict)
+            ae_net_dict = {k: v for k, v in ae_dict.items() if k in net_dict}
+            net_dict.update(ae_net_dict)
+
+            net.load_state_dict(ae_net_dict)
 
     def train(self,
               dataloader,
@@ -198,7 +187,7 @@ class PaDiMSVDD(PaDiMBase):
 
                 embeddings = self._embed_batch_flatten(imgs)
                 outputs = self.net(embeddings)
-                dist = torch.sum((outputs - self.c)**2, dim=1)
+                dist = torch.sum(((outputs - self.c)**2).min(dim=1), dim=1)
                 if self.objective == 'soft-boundary':
                     scores = dist - self.R**2
                     loss = self.R**2 + (1 / self.nu) * torch.mean(
@@ -250,22 +239,26 @@ class PaDiMSVDD(PaDiMBase):
 
     def _init_center_c(self, dataloader, eps=0.1):
         n_samples = 0
-        c = torch.zeros(self.net.rep_dim, device=self.device)
+        c = torch.zeros((self.n_svdds, self.net.rep_dim), device=self.device)
+
         self.net.eval()
         with torch.no_grad():
             for inputs, _ in tqdm(dataloader):
-                inputs = inputs.to(self.device)
-                inputs = self._embed_batch_flatten(inputs)
+                for i, svdd in enumerate(self.net.svdds):
+                    inputs = inputs.to(self.device)
+                    inputs = self._embed_batch_flatten(inputs)
 
-                outputs = self.net(inputs)
-                n_samples += outputs.size(0)
-                c += torch.sum(outputs, dim=0)
+                    outputs = svdd(inputs)
+                    c[i, :] += torch.sum(outputs, dim=0)
+                    if i == 0:
+                        n_samples += outputs.size(0)
         c /= n_samples
 
         # If c_i is too close to 0, set to +-eps.
         # Reason: a zero unit can be trivially matched with zero weights.
-        c[(abs(c) < eps) & (c < 0)] = -eps
-        c[(abs(c) < eps) & (c > 0)] = eps
+        for i in range(self.n_svdds):
+            c[i, (abs(c[i]) < eps) & (c[i] < 0)] = -eps
+            c[i, (abs(c[i]) < eps) & (c[i] > 0)] = eps
 
         return c
 
@@ -288,7 +281,7 @@ class PaDiMSVDD(PaDiMBase):
         """
         Returns placeholders for the mean and covariance
         """
-        return torch.zeros((1,)), torch.zeros((1, 1)), self.embedding_ids
+        return torch.zeros((1, )), torch.zeros((1, 1)), self.embedding_ids
 
     def _get_inv_cvars(self, a):
         """
