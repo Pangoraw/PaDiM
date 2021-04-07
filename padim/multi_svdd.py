@@ -17,7 +17,7 @@ class MultiDeepSVDD(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         results = torch.stack(
-            (svdd(x) for svdd in self.svdds),
+            [svdd(x) for svdd in self.svdds],
             dim=1
         )  # (b * h * w) * n * rep_dim
         return results
@@ -26,14 +26,14 @@ class MultiDeepSVDD(nn.Module):
 class MultiAutoEncoder(nn.Module):
     def __init__(self, n, *args, **kwargs):
         super(MultiAutoEncoder, self).__init__()
+        self.n = n
         self.auto_encoders = nn.ModuleList([
             build_autoencoder(*args, **kwargs)
             for _ in range(self.n)
         ])
-        self.n = n
         self.current_auto_encoder = 0
 
     def forward(self, x):
         self.current_auto_encoder = (self.current_auto_encoder + 1) % self.n
-        res = self.auto_encoders[self.current_auto_encoder]
+        res = self.auto_encoders[self.current_auto_encoder](x)
         return res

@@ -26,8 +26,8 @@ else
 			--oe_frequency $OE_FREQUENCY \
 			--n_epochs $N_EPOCHS \
 			--ae_n_epochs $AE_N_EPOCHS \
-			# --pretrain \
-			--n_svdds ${N_SVDDS-1} \
+			--pretrain \
+			--n_svdds ${N_SVDDS-4} \
 			--train_limit $TRAIN_LIMIT \
 			--params_path $PARAMS_PATH \
 			| tee -a $LOG_FILE
