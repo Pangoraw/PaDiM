@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data import DataLoader
+from sklearn.metrics import roc_auc_score
 
 from padim.datasets import (
     LimitedDataset,
@@ -39,7 +40,8 @@ def test(cfg, padim, t):
     TEST_FOLDER = cfg.test_folder
 
     predict_args = {}
-    predict_args["compare_all"] = cfg.compare_all
+    if cfg.compare_all:
+        predict_args["compare_all"] = cfg.compare_all
 
     img_transforms = transforms.Compose([
         transforms.ToTensor(),
@@ -64,14 +66,25 @@ def test(cfg, padim, t):
     total_positive_proposals = 0
     positive_proposals = 0
 
+    y_trues = []
+    y_preds = []
+
     means, covs, _ = padim.get_params()
     inv_cvars = padim._get_inv_cvars(covs)
     pbar = tqdm(test_dataloader)
-    for loc, img, mask in pbar:
+    for loc, img, mask, y_true in pbar:
         # 1. Prediction
         res = padim.predict(img, params=(means, inv_cvars), **predict_args)
+        preds = [res.max().item()]
         res = (res - res.min()) / (res.max() - res.min())
         res = res.reshape((LATTICE, LATTICE)).cpu()
+
+        y_trues.extend(y_true.numpy())
+        y_preds.extend(preds)
+
+        # Don't do proposals and counts for normal images
+        if y_true[0] == 1:
+            continue
 
         def normalize_box(box):
             x1, y1, x2, y2, s = box
@@ -144,6 +157,10 @@ def test(cfg, padim, t):
         pbar.set_description(f"PPR: {PPR:.3f} RECALL: {recall:.3f}")
 
     results = {}
+
+    roc_score = roc_auc_score(y_trues, y_preds)
+    print(f"roc auc score: {roc_score}")
+    results["roc_auc_score"] = roc_score
 
     print(f"positive proposals: {positive_proposals}")
     print(f"total positive proposals: {total_positive_proposals}")

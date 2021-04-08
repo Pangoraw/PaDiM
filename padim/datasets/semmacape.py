@@ -85,20 +85,22 @@ class SemmacapeTestDataset(Dataset):
         w, h = img.size
         img = self.transforms(img)
 
-        with open(img_location.replace(".jpg", ".txt")) as f:
-            boxes = [
-                [float(x) for x in l.split(" ")[1:-1]]
-                for l in f.readlines()
-            ]
-
         _, w, h = img.shape
         mask = np.zeros((w, h))
-        for cx, cy, bw, bh in boxes:
-            x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
-            x2, y2 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
-            mask[y1:y2, x1:x2] = 1.0
+        is_image_normal = "normal" in img_location
 
-        return (img_location, img, mask)
+        if not is_image_normal:
+            with open(img_location.replace(".jpg", ".txt")) as f:
+                boxes = [
+                    [float(x) for x in l.split(" ")[1:-1]]
+                    for l in f.readlines()
+                ]
+            for cx, cy, bw, bh in boxes:
+                x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
+                x2, y2 = int((cx + bw / 2) * w), int((cy + bh / 2) * h)
+                mask[y1:y2, x1:x2] = 1.0
+
+        return (img_location, img, mask, int(is_image_normal))
 
     def __len__(self):
         return len(self.image_files)
