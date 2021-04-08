@@ -8,6 +8,26 @@ from padim.datasets import (
 )
 from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 
+grouped_classes_labels = ["Dauphins", "Oiseaux_Poses", "Oiseaux_Vol"]
+accepted_classes = {
+    # Dauphins
+    "Dauphin_BleuBlanc": 0,
+    "Dauphin_Commun": 0,
+    "Grand_Dauphin": 0,
+    "Delphinid_Ind.": 0,
+
+    # Oiseaux poses
+    "Sterne_Pose": 1,
+    "Petit_Puffin_Pose": 1,
+    "Goeland_Pose": 1,
+    "Fou_Bassan_Pose": 1,
+
+    # Oiseaux vol
+    "Sterne_Vol": 2,
+    "Petit_Puffin_Vol": 2,
+    "Goeland_Vol": 2,
+    "Fou_Bassan_Vol": 2,
+}
 
 def test(cfg, padim, t):
     LIMIT = cfg.test_limit
@@ -16,6 +36,7 @@ def test(cfg, padim, t):
     MIN_AREA = cfg.min_area
     USE_NMS = cfg.use_nms
     LATTICE = 104
+    TEST_FOLDER = cfg.test_folder
 
     predict_args = {}
     predict_args["compare_all"] = cfg.compare_all
@@ -27,7 +48,7 @@ def test(cfg, padim, t):
                              std=[0.229, 0.224, 0.225]),
     ])
     test_dataset = SemmacapeTestDataset(
-        data_dir="/share/projects/semmacape/Data_Semmacape_2/416_non_empty/",
+        data_dir=TEST_FOLDER,
         transforms=img_transforms,
     )
     test_dataloader = DataLoader(batch_size=1,
@@ -150,6 +171,13 @@ def test(cfg, padim, t):
         f1 = 2 * (ppr * recall) / (ppr + recall)
     results['f1_score'] = f1
     print(f"F1_SCORE: {f1}")
+
+    grouped_classes = {cls: (0, 0, 0, 0) for cls in grouped_classes_labels}
+    for cls, data in classes.items():
+        acc = grouped_classes[grouped_classes_labels[accepted_classes[cls]]]
+        grouped_classes[grouped_classes_labels[accepted_classes[cls]]] = tuple(map(sum, zip(data, acc)))
+
+    classes.update(grouped_classes)
 
     for cls, (detected, n_cls_proposals, cls_sum_iou,
               n_cls_gt) in classes.items():

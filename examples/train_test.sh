@@ -16,6 +16,8 @@ cat $CONFIG_FILE | tee -a $LOG_FILE
 TRAIN_FOLDER=${TRAIN_FOLDER-./data/semmacape/}
 TEST_FOLDER=${TEST_FOLDER-/share/projects/semmacape/Data_Semmacape_2/416_non_empty_filtered/}
 
+echo "Starting script"
+
 python examples/main.py \
   --train_folder $TRAIN_FOLDER \
   --test_folder $TEST_FOLDER \

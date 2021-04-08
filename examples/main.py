@@ -1,9 +1,13 @@
 import argparse
+import os
+import pickle
 import sys
 
 import keepsake
 
 sys.path.append("./")
+
+from padim import PaDiM, PaDiMShared, PaDiMSVDD
 
 from padeep import train as train_padeep
 from semmacape import train as train_padim
@@ -54,24 +58,38 @@ def main():
         method = "padim"
     params_dict["method"] = method
 
+    print("Starting experiment")
     experiment = keepsake.init(
-        path=".",
         params=params_dict,
     )
+    print("Experiment started")
 
-    if cfg.deep:
-        model = train_padeep(cfg)
+    if os.path.exists(cfg.params_path):
+        with open(cfg.params_path, "rb") as f:
+            params = pickle.load(f)
+        if cfg.deep:
+            Model = PaDiMSVDD
+        elif cfg.shared:
+            Model = PaDiMShared
+        else:
+            Model = PaDiM
+        model = Model.from_residuals(*params, device="cuda")
     else:
-        model = train_padim(cfg)
+        if cfg.deep:
+            model = train_padeep(cfg)
+        else:
+            model = train_padim(cfg)
 
-    for t in range(.1, .8, .1):
-        results = test_padim(cfg, model, t)
+    for t in range(1, 8):
+        threshold = t / 10
+        results = test_padim(cfg, model, threshold)
         experiment.checkpoint(
             step=t,
             metrics=results,
             primary_metric=("f1_score", "maximize"),
         )
 
+    experiment.stop()
 
 if __name__ == "__main__":
     main()
