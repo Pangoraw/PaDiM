@@ -45,6 +45,8 @@ def test(cfg, padim):
         y_trues.extend(y_true.numpy())
         y_preds.extend(preds)
 
+    # from 1 normal to 1 anomalous
+    y_trues = list(map(lambda x: 1.0 - x, y_trues))
     roc_score = roc_auc_score(y_trues, y_preds)
     print(f"roc_auc_score: {roc_score}")
 

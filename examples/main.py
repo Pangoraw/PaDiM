@@ -12,7 +12,7 @@ from padim import PaDiM, PaDiMShared, PaDiMSVDD
 from padeep import train as train_padeep
 from semmacape import train as train_padim
 from test_semmacape import test as test_semmacape
-from test_mvted import test as test_mvtec
+from test_mvtec import test as test_mvtec
 
 
 def parse_args():

@@ -158,6 +158,8 @@ def test(cfg, padim, t):
 
     results = {}
 
+    # from 1 normal to 1 anomalous
+    y_trues = list(map(lambda x: 1.0 - x, y_trues))
     roc_score = roc_auc_score(y_trues, y_preds)
     print(f"roc auc score: {roc_score}")
     results["roc_auc_score"] = roc_score
