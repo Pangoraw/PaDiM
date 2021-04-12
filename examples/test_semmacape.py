@@ -72,7 +72,7 @@ def test(cfg, padim, t):
     means, covs, _ = padim.get_params()
     inv_cvars = padim._get_inv_cvars(covs)
     pbar = tqdm(test_dataloader)
-    for loc, img, mask, y_true in pbar:
+    for loc, img, _, y_true in pbar:
         # 1. Prediction
         res = padim.predict(img, params=(means, inv_cvars), **predict_args)
         preds = [res.max().item()]

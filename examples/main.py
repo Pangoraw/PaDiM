@@ -11,7 +11,8 @@ from padim import PaDiM, PaDiMShared, PaDiMSVDD
 
 from padeep import train as train_padeep
 from semmacape import train as train_padim
-from test_semmacape import test as test_padim
+from test_semmacape import test as test_semmacape
+from test_mvted import test as test_mvtec
 
 
 def parse_args():
@@ -80,13 +81,20 @@ def main():
         else:
             model = train_padim(cfg)
 
-    for t in range(1, 8):
-        threshold = t / 10
-        results = test_padim(cfg, model, threshold)
+    if "semmacape" in cfg.test_folder:
+        for t in range(1, 8):
+            threshold = t / 10
+            results = test_semmacape(cfg, model, threshold)
+            experiment.checkpoint(
+                step=t,
+                metrics=results,
+                primary_metric=("f1_score", "maximize"),
+            )
+    else:
+        results = test_mvtec(cfg, model)
         experiment.checkpoint(
-            step=t,
             metrics=results,
-            primary_metric=("f1_score", "maximize"),
+            primary_metric=("roc_auc_score", "maximize"),
         )
 
     experiment.stop()
