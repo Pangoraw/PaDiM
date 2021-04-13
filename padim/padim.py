@@ -146,11 +146,10 @@ class PaDiM(PaDiMBase):
 
         if compare_all:
             distances = mahalanobis_multi(embeddings, means, inv_cvars)
-            print("distances.shape = ", distances.shape)
-            distances = distances.min(dim=0)
+            distances, _ = distances.min(dim=0)
         else:
             distances = mahalanobis_sq(embeddings, means, inv_cvars)
-        return distances
+        return torch.sqrt(distances)
 
     def get_residuals(self) -> Tuple[int, NDArray, NDArray, NDArray, str]:
         """

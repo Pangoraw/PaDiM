@@ -9,25 +9,24 @@ from padim.datasets import (
 )
 from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 
-grouped_classes_labels = ["Dauphins", "Oiseaux_Poses", "Oiseaux_Vol"]
+grouped_classes_labels = ["Dauphins", "Oiseaux"]
 accepted_classes = {
-    # Dauphins
+    # Dauphins: 0
     "Dauphin_BleuBlanc": 0,
     "Dauphin_Commun": 0,
     "Grand_Dauphin": 0,
     "Delphinid_Ind.": 0,
 
-    # Oiseaux poses
+    # Oiseaux: 1
     "Sterne_Pose": 1,
     "Petit_Puffin_Pose": 1,
     "Goeland_Pose": 1,
     "Fou_Bassan_Pose": 1,
 
-    # Oiseaux vol
-    "Sterne_Vol": 2,
-    "Petit_Puffin_Vol": 2,
-    "Goeland_Vol": 2,
-    "Fou_Bassan_Vol": 2,
+    "Sterne_Vol": 1,
+    "Petit_Puffin_Vol": 1,
+    "Goeland_Vol": 1,
+    "Fou_Bassan_Vol": 1,
 }
 
 def test(cfg, padim, t):

@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument("--ae_n_epochs", type=int, default=1)
     parser.add_argument("--n_svdds", type=int, default=1)
     parser.add_argument("--pretrain", action="store_true")
+    parser.add_argument("--use_self_supervision", action="store_true")
 
     return parser.parse_args()
 

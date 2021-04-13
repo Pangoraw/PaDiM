@@ -4,6 +4,7 @@ from tqdm import tqdm
 import pandas as pd
 from PIL import Image
 from torchvision import transforms
+from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 
 from padim import PaDiM, PaDiMShared
@@ -53,16 +54,23 @@ def train(cfg):
             std=[0.229, 0.224, 0.225]
         ),
     ])
+    if "semmacape" in cfg.train_folder:
+        training_dataset = TrainingDataset(
+            data_dir=cfg.train_folder,
+            img_transforms=img_transforms,
+        )
+    else:
+        training_dataset = ImageFolder(root=cfg.train_folder, transform=img_transforms)
+
     dataloader = DataLoader(
         batch_size=32,
         num_workers=4,
-        dataset=LimitedDataset(limit=LIMIT, dataset=TrainingDataset(
-            data_dir="./data/semmacape/416_empty/",
-            img_transforms=img_transforms,
-        )),
+        dataset=LimitedDataset(limit=LIMIT, dataset=training_dataset),
     )
 
     for batch in tqdm(dataloader):
+        if isinstance(batch, tuple) or isinstance(batch, list):
+            batch = batch[0]
         padim.train_one_batch(batch)
 
     print(">> Saving params")
@@ -70,3 +78,5 @@ def train(cfg):
     with open(PARAMS_PATH, 'wb') as f:
         pickle.dump(params, f)
     print(f">> Params saved at {PARAMS_PATH}")
+
+    return padim

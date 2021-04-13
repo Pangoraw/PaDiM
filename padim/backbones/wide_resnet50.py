@@ -35,3 +35,4 @@ class WideResNet50(Module):
         feature_3 = self.wide_resnet50.layer3(feature_2)
 
         return feature_1, feature_2, feature_3
+

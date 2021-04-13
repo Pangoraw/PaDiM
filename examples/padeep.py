@@ -19,9 +19,11 @@ handler = logging.StreamHandler(sys.stdout)
 root = logging.getLogger()
 root.addHandler(handler)
 
+torch.autograd.set_detect_anomaly(True)
 
 def train(args):
     PARAMS_PATH = args.params_path
+    USE_SELF_SUPERVISION = args.use_self_supervision
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -58,7 +60,7 @@ def train(args):
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=16,
+        batch_size=8,
         num_workers=16,
         shuffle=False,
     )
@@ -80,6 +82,7 @@ def train(args):
         train_dataloader,
         n_epochs=args.n_epochs,
         outlier_exposure=True,
+        self_supervision=USE_SELF_SUPERVISION,
     )
 
     print(">> Saving params")
@@ -87,3 +90,5 @@ def train(args):
     with open(PARAMS_PATH, 'wb') as f:
         pickle.dump(params, f)
     print(f">> Params saved at {PARAMS_PATH}")
+
+    return padeep

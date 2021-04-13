@@ -68,7 +68,7 @@ class PaDiMShared(PaDiMBase):
         assert b == 1, f"batch size should be 1, got {b}"
         embeddings = embeddings.reshape(c, w * h).permute(1, 0)
         distances = mahalanobis_sq(embeddings, mean, inv_cov)
-        return distances
+        return torch.sqrt(distances)
 
     def get_params(self, epsilon: float = 0.01):
         """

@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torchvision import utils as visionutils
 from tqdm import tqdm
 
+from padim.deep_svdd import PositionClassifier, self_supervised_loss
 from padim.multi_svdd import MultiDeepSVDD, MultiAutoEncoder
 from padim.base import PaDiMBase
 
@@ -31,6 +32,8 @@ class PaDiMSVDD(PaDiMBase):
     ):
         super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
         self._init_params(**kwargs)
+
+        self.use_self_supervision = False
 
         self.net_name = "MLPNet"
         self.net = MultiDeepSVDD(n_svdds=self.n_svdds,
@@ -118,7 +121,7 @@ class PaDiMSVDD(PaDiMBase):
                 loss_epoch += loss.item()
                 n_batches += 1
 
-            message = '\tEpoch {}/{}\t Loss: {:.8f}'.format(
+            message = 'Epoch {}/{} Loss: {:.8f}'.format(
                 epoch + 1, n_epochs, loss_epoch / n_batches)
             pbar.set_description(message)
             scheduler.step()
@@ -137,10 +140,12 @@ class PaDiMSVDD(PaDiMBase):
               n_epochs=10,
               test_images=None,
               test_cb=None,
-              outlier_exposure=False):
+              outlier_exposure=False,
+              self_supervision=False):
         logger = logging.getLogger()
 
         self.net = self.net.to(self.device)
+        self.use_self_supervision = self_supervision
 
         loss_writer = SummaryWriter("tboard/losses")
         if test_images is not None:
@@ -157,6 +162,15 @@ class PaDiMSVDD(PaDiMBase):
 
             def make_test(_):
                 pass
+
+        if self_supervision:
+            # Encoder optimizer
+            encoder_optimizer = optim.Adam(
+                self.model.parameters(),
+                lr=self.lr,
+                weight_decay=self.weight_decay,
+                amsgrad=self.optimizer_name == 'amsgrad')
+            position_classifier = PositionClassifier(self.num_embeddings).to(self.device)
 
         # Set optimizer (Adam optimizer for now)
         optimizer = optim.Adam(self.net.parameters(),
@@ -185,7 +199,8 @@ class PaDiMSVDD(PaDiMBase):
 
                 optimizer.zero_grad()
 
-                embeddings = self._embed_batch_flatten(imgs)
+                embeddings = self._embed_batch_flatten(imgs, self_supervision)
+
                 outputs = self.net(embeddings)
                 dist = torch.sum((outputs - self.c)**2, dim=2)
                 dist, _ = dist.min(dim=1)
@@ -207,8 +222,22 @@ class PaDiMSVDD(PaDiMBase):
                     else:
                         loss = torch.mean(dist)
 
-                loss.backward()
+                loss.backward(retain_graph=True)
                 optimizer.step()
+
+                if self_supervision:
+                    encoder_optimizer.zero_grad()
+                    if not outlier_exposure:
+                        normal_embeddings = embeddings
+                    else:
+                        batch_size = y_true.size(0)
+                        y_true_embeddings = y_true.bool().repeat(
+                            (self.num_patches, 1)
+                        ).permute(1, 0).flatten()  # batch_size -> batch_size * num_embeddings
+                        normal_embeddings = embeddings[y_true_embeddings]
+                    ssl = self_supervised_loss(normal_embeddings, position_classifier, device=self.device)
+                    ssl.backward()
+                    encoder_optimizer.step()
 
                 if (self.objective == 'soft-boundary') and (
                         epoch >= self.warm_up_n_epochs):
@@ -220,7 +249,6 @@ class PaDiMSVDD(PaDiMBase):
                 epoch + 1, n_epochs, loss_epoch / n_batches)
 
             pbar.set_description(message)
-            logger.info(message)
             loss_writer.add_scalar("losses", loss_epoch, epoch)
 
             scheduler.step()
@@ -297,12 +325,22 @@ class PaDiMSVDD(PaDiMBase):
         net_dict = self.net.state_dict()
         objective = self.objective
         c, R = self.c, self.R
+        if self.use_self_supervision:
+            backbone_dict = self.model.state_dict()
+            return net_dict, objective, c, R, detach_numpy(
+                self.embedding_ids), backbone, backbone_dict
         return net_dict, objective, c, R, detach_numpy(
             self.embedding_ids), backbone
 
     @staticmethod
-    def from_residuals(net_dict, objective, c, R, embedding_ids, backbone,
-                       device):
+    def from_residuals(net_dict,
+                       objective,
+                       c,
+                       R,
+                       embedding_ids,
+                       backbone,
+                       backbone_dict=None,
+                       device="cuda"):
         num_embeddings, = embedding_ids.shape
         padim = PaDiMSVDD(num_embeddings=num_embeddings,
                           backbone=backbone,
@@ -317,5 +355,8 @@ class PaDiMSVDD(PaDiMBase):
             padim.c = c.clone().to(device)
         else:
             padim.c = torch.tensor(c, device=device)
+
+        if backbone_dict is not None:
+            padim.model.load_state_dict(backbone_dict)
 
         return padim

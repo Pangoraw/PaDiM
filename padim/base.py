@@ -42,9 +42,12 @@ class PaDiMBase:
         self.num_patches = self.model.num_patches
         self.max_embeddings_size = self.model.embeddings_size
 
-    def _embed_batch(self, imgs: Tensor) -> Tensor:
-        self.model.eval()
-        with torch.no_grad():
+    def _embed_batch(self, imgs: Tensor, with_grad: bool = False) -> Tensor:
+        if with_grad:
+            self.model.eval()
+        else:
+            self.model.train()
+        with torch.set_grad_enabled(with_grad):
             feature_1, feature_2, feature_3 = self.model(imgs.to(self.device))
         embeddings = embeddings_concat(feature_1, feature_2)
         embeddings = embeddings_concat(embeddings, feature_3)
@@ -55,7 +58,7 @@ class PaDiMBase:
         )
         return embeddings
 
-    def _embed_batch_flatten(self, imgs):
-        embeddings = self._embed_batch(imgs)
+    def _embed_batch_flatten(self, imgs, *args):
+        embeddings = self._embed_batch(imgs, *args)
         _, C, _, _ = embeddings.shape
         return embeddings.permute(0, 2, 3, 1).reshape((-1, C))
