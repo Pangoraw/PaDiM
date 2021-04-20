@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import pickle
 import sys
 
@@ -12,6 +13,7 @@ sys.path.append("../padim")
 
 from padim.datasets import LimitedDataset, OutlierExposureDataset
 from padim import PaDiMSVDD
+from semmacape import TrainingDataset
 
 logging.basicConfig(filename="logs/padeep.log", level=logging.INFO)
 handler = logging.StreamHandler(sys.stdout)
@@ -41,11 +43,20 @@ def train(args):
         ),
     ])
 
-    normal_dataset = LimitedDataset(
-        ImageFolder(
+    if "semmacape" in args.train_folder:
+        training_dataset = TrainingDataset(
+            data_dir=args.train_folder,
+            img_transforms=img_transforms,
+        )
+    else:
+        training_dataset = ImageFolder(
             root=args.train_folder,
             target_transform=lambda _: 1,  # images are always normal
-            transform=img_transforms),
+            transform=img_transforms,
+        )
+
+    normal_dataset = LimitedDataset(
+        dataset=training_dataset,
         limit=args.train_limit,
     )
     if args.oe_folder is not None:
@@ -58,17 +69,18 @@ def train(args):
     else:
         train_dataset = normal_dataset
 
+    n_cpus = int(os.getenv("SLURM_CPUS_PER_TASK", 12))
     train_dataloader = DataLoader(
         dataset=train_dataset,
         batch_size=8,
-        num_workers=16,
+        num_workers=n_cpus,
         shuffle=False,
     )
 
     train_normal_dataloader = DataLoader(
         dataset=normal_dataset,
         batch_size=16,
-        num_workers=16,
+        num_workers=n_cpus,
         shuffle=True,
     )
 

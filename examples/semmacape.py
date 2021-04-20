@@ -1,3 +1,4 @@
+import os
 import pickle
 
 from tqdm import tqdm
@@ -28,7 +29,7 @@ class TrainingDataset(Dataset):
         img = Image.open(img_path)
         img = self.transforms(img)
 
-        return img
+        return img, 1
 
     def __len__(self):
         length, _ = self.data_frame.shape
@@ -62,9 +63,10 @@ def train(cfg):
     else:
         training_dataset = ImageFolder(root=cfg.train_folder, transform=img_transforms)
 
+    n_cpus = int(os.getenv("SLURM_CPUS_PER_TASK", 12))
     dataloader = DataLoader(
         batch_size=32,
-        num_workers=4,
+        num_workers=n_cpus,
         dataset=LimitedDataset(limit=LIMIT, dataset=training_dataset),
     )
 

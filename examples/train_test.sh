@@ -1,10 +1,7 @@
 #!/bin/bash
 
 #SBATCH --gres=gpu:1
-#SBATCH -c 4
-#SBATCH -w titan4
-#SBATCH -C titan
-#SBATCH -p shortrun
+#SBATCH -c 6
 #SBATCH --mail-type=FAIL,END
 
 if [[ ! -z ${SLURM_JOBID+z} ]];
@@ -29,10 +26,11 @@ set +o allexport
 echo ">> Config: "
 cat $CONFIG_FILE | tee -a $LOG_FILE
 
-TRAIN_FOLDER=${TRAIN_FOLDER-./data/semmacape/}
+TRAIN_FOLDER=${TRAIN_FOLDER-./data/semmacape/416_empty/}
 TEST_FOLDER=${TEST_FOLDER-/share/projects/semmacape/Data_Semmacape_2/416_non_empty_filtered/}
 
 echo "Starting script"
+echo $(date)
 
 python examples/main.py \
   --train_folder $TRAIN_FOLDER \
@@ -51,3 +49,5 @@ python examples/main.py \
   --use_nms \
   ${EXTRA_FLAGS-} \
   | tee -a $LOG_FILE
+
+echo $(date)
