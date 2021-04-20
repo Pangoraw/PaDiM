@@ -72,7 +72,7 @@ def train(args):
     n_cpus = int(os.getenv("SLURM_CPUS_PER_TASK", 12))
     train_dataloader = DataLoader(
         dataset=train_dataset,
-        batch_size=8,
+        batch_size=16,
         num_workers=n_cpus,
         shuffle=False,
     )
