@@ -11,7 +11,7 @@ class ResNet18(Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.resnet18 = resnet18(pretrained=True)
+        self.resnet18 = resnet18(pretrained=True).eval()
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the three intermediary layers from the ResNet18
