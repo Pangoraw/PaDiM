@@ -43,10 +43,6 @@ class PaDiMBase:
         self.max_embeddings_size = self.model.embeddings_size
 
     def _embed_batch(self, imgs: Tensor, with_grad: bool = False) -> Tensor:
-        if with_grad:
-            self.model.eval()
-        else:
-            self.model.train()
         with torch.set_grad_enabled(with_grad):
             feature_1, feature_2, feature_3 = self.model(imgs.to(self.device))
         embeddings = embeddings_concat(feature_1, feature_2)

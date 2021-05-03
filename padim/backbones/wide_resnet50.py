@@ -11,7 +11,7 @@ class WideResNet50(Module):
 
     def __init__(self) -> None:
         super().__init__()
-        self.wide_resnet50 = wide_resnet50_2(pretrained=True)
+        self.wide_resnet50 = wide_resnet50_2(pretrained=True).eval()
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the three intermediary layers from the WideResNet50
