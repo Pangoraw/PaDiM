@@ -12,17 +12,29 @@ class OCIC:
 
   def __init__(self, device):
     self.device = device
+    self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
     self.backbone = resnet18(pretrained=True).to(device).eval()
-    self.mean = torch.zeros((512,), device=device)
-    self.cov_sum = torch.zeros((512, 512), device=device)
+    self.feature_size = 448
+    self.mean = torch.zeros((self.feature_size,), device=device)
+    self.cov_sum = torch.zeros((self.feature_size, self.feature_size), device=device)
     self.N = 0
 
   def _embed(self, x: Tensor) -> Tensor:
     with torch.no_grad():
-      for name, module in self.backbone._modules.items():
-        x = module(x)
-        if name == 'avgpool': # Stop before fc layer
-          return x
+        x = self.backbone.conv1(x)
+        x = self.backbone.bn1(x)
+        x = self.backbone.relu(x)
+        x = self.backbone.maxpool(x)
+
+        feature_1 = self.backbone.layer1(x)
+        feature_2 = self.backbone.layer2(feature_1)
+        feature_3 = self.backbone.layer3(feature_2)
+
+        feature_1 = self.avgpool(feature_1).squeeze(2).squeeze(2)
+        feature_2 = self.avgpool(feature_2).squeeze(2).squeeze(2)
+        feature_3 = self.avgpool(feature_3).squeeze(2).squeeze(2)
+
+        return torch.cat((feature_1, feature_2, feature_3), dim=1)
 
   def train_one_batch(self, batch: Tensor):
     embeddings = self._embed(batch)  # n * 512
@@ -40,7 +52,7 @@ class OCIC:
     means = self.mean.detach().clone()
     covs = self.cov_sum.detach().clone()
 
-    identity = torch.eye(512).to(self.device)
+    identity = torch.eye(self.feature_size).to(self.device)
     means /= self.N
     covs -= self.N * torch.outer(means, means)
     covs /= self.N - 1
