@@ -10,13 +10,14 @@ from tqdm import tqdm
 
 sys.path.append("../padim/")
 
-from padim.ocic import OCIC
+from padim.ocic import OCIC, OCICSVDD
 
 
 def parse_args():
   parser = argparse.ArgumentParser("OCIC Trainer")
   parser.add_argument("--train_folder", required=True)
   parser.add_argument("--params_path", required=True)
+  parser.add_argument("--method", default="gaussian", choices=["gaussian", "svdd"])
   return parser.parse_args()
 
 
@@ -28,15 +29,20 @@ def main(args):
     batch_size=32,
     num_workers=16,
   )
-  ocic = OCIC(device)
 
-  for imgs, _ in tqdm(dataloader):
-    imgs = imgs.to(device)
-    ocic.train_one_batch(imgs)
+  if args.method == "gaussian":
+    Model = OCIC
+  elif args.method == "svdd":
+    Model = OCICSVDD
+  else:
+    raise NotImplementedError(args.method)
+
+  ocic = Model(device)
+  ocic.train(dataloader)
 
   params = ocic.get_residuals()
   with open(args.params_path, "wb") as f:
-    pickle.dump(params, f)
+    pickle.dump((args.method,) + params, f)
 
 
 if __name__ == "__main__":
