@@ -342,10 +342,15 @@ class PaDiMSVDD(PaDiMBase):
                        backbone_dict=None,
                        device="cuda"):
         num_embeddings, = embedding_ids.shape
+        n_svdds = 0
+        for key in net_dict.keys():
+            if key.startswith("svdds."):
+                n_svdds = max(n_svdds, int(key[6:].split(".")[0]))
+        n_svdds += 1
         padim = PaDiMSVDD(num_embeddings=num_embeddings,
                           backbone=backbone,
                           device=device,
-                          n_svdds=4,
+                          n_svdds=n_svdds,
                           R=R)
         padim.net.load_state_dict(net_dict)
         padim.net = padim.net.to(device)
