@@ -114,12 +114,15 @@ def test(cfg, padim, t):
                 # (# detected, # proposals, sum(iou), total number of GT)
                 classes[cls] = (0, len(preds), 0, 1)
                 # Hypothesis: only one class per image
-                img_proposals_counted = True
-            else:
-                n_proposals_offset = 0 if img_proposals_counted else len(preds)
-                classes[cls] = (classes[cls][0],
-                                classes[cls][1] + n_proposals_offset,
-                                classes[cls][2], classes[cls][3] + 1)
+            elif not img_proposals_counted:
+                classes[cls] = (
+                    classes[cls][0],
+                    classes[cls][1] + len(preds),
+                    classes[cls][2],
+                    classes[cls][3] + 1
+                )
+            img_proposals_counted = True
+
             x1, y1 = float(cx) - float(bw) / 2, float(cy) - float(bh) / 2
             w, h = float(bw), float(bh)
             box = (x1, y1, w, h)
