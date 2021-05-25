@@ -106,20 +106,20 @@ def test(cfg, padim, t):
         with open(loc[0].replace('.jpg', '_with_name_label.txt'), 'r') as f:
             lines = f.readlines()
 
+        n_gt += len(lines)
         for line in lines:
-            n_gt += 1
             cls, cx, cy, bw, bh, _ = line.split(' ')
             if cls not in classes:
                 # classes[cls] =
                 # (# detected, # proposals, sum(iou), total number of GT)
-                classes[cls] = (0, len(preds), 0, 1)
+                classes[cls] = (0, len(preds), 0, len(lines))
                 # Hypothesis: only one class per image
             elif not img_proposals_counted:
                 classes[cls] = (
                     classes[cls][0],
                     classes[cls][1] + len(preds),
                     classes[cls][2],
-                    classes[cls][3] + 1
+                    classes[cls][3] + len(lines),
                 )
             img_proposals_counted = True
 
