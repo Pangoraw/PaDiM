@@ -1,4 +1,7 @@
+import pickle
+
 from tqdm import tqdm
+import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_auc_score
@@ -8,6 +11,8 @@ from padim.datasets import (
     SemmacapeTestDataset,
 )
 from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
+from padim import OCIC
+
 
 grouped_classes_labels = ["Dauphins", "Oiseaux"]
 accepted_classes = {
@@ -37,6 +42,11 @@ def test(cfg, padim, t):
     USE_NMS = cfg.use_nms
     LATTICE = 104
     TEST_FOLDER = cfg.test_folder
+
+    # with open("./lower_ocic.pckl", "rb") as f:
+    #     params = pickle.load(f)
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    # ocic = OCIC.from_residuals(*params, "cpu")
 
     predict_args = {}
     if cfg.compare_all:
@@ -90,12 +100,19 @@ def test(cfg, padim, t):
             return (x1 / LATTICE, y1 / LATTICE, abs(x1 - x2) / LATTICE,
                     abs(y1 - y2) / LATTICE, s)
 
+        def pred_ocic(box):
+            x, y, x2, y2 = box[:4]
+            patch = img[0, :, y:y2, x:x2]
+            pred = ocic.predict(patch.unsqueeze(0)).squeeze().item()
+            return pred > 10.
+
         preds = propose_regions(
             res,
             threshold=THRESHOLD,
             min_area=MIN_AREA,
             use_nms=USE_NMS,
         )
+        # preds = list(filter(pred_ocic, preds))
         preds = [normalize_box(box)
                  for box in preds]  # map from 0,LATTICE to 0,1
         n_proposals += len(preds)
@@ -113,6 +130,10 @@ def test(cfg, padim, t):
                 # classes[cls] =
                 # (# detected, # proposals, sum(iou), total number of GT)
                 classes[cls] = (0, len(preds), 0, len(lines))
+                #               ^  ^           ^  ^
+                #               |  |           |  |
+                #               |  n_preds     |  n_gt_boxes
+                #               n_detected     mean_iou
                 # Hypothesis: only one class per image
             elif not img_proposals_counted:
                 classes[cls] = (
