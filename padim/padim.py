@@ -21,8 +21,9 @@ class PaDiM(PaDiMBase):
         num_embeddings: int = 100,
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
+        size: Union[None, Tuple[int, int]] = None,
     ):
-        super(PaDiM, self).__init__(num_embeddings, device, backbone)
+        super(PaDiM, self).__init__(num_embeddings, device, backbone, size)
         self.N = 0
         self.means = torch.zeros(
             (self.num_patches, self.num_embeddings)).to(self.device)
