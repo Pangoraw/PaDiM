@@ -60,10 +60,10 @@ def main():
         method = "padim"
     params_dict["method"] = method
 
-    print("Starting experiment")
-    experiment = keepsake.init(
-        params=params_dict,
-    )
+    #print("Starting experiment")
+    #experiment = keepsake.init(
+    #    params=params_dict,
+    #)
     print("Experiment started")
 
     if os.path.exists(cfg.params_path):
@@ -93,12 +93,12 @@ def main():
             )
     else:
         results = test_mvtec(cfg, model)
-        experiment.checkpoint(
-            metrics=results,
-            primary_metric=("roc_auc_score", "maximize"),
-        )
+        #experiment.checkpoint(
+        #    metrics=results,
+        #    primary_metric=("roc_auc_score", "maximize"),
+        #)
 
-    experiment.stop()
+    #experiment.stop()
 
 if __name__ == "__main__":
     main()

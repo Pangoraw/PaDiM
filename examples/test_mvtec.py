@@ -25,7 +25,7 @@ def test(cfg, padim):
 
     test_dataset = ImageFolder(root=TEST_FOLDER,
                                transform=img_transforms,
-                               target_transform=lambda x: int(test_dataset.class_to_idx["good"] == x))
+                               target_transform=lambda x: int(test_dataset.class_to_idx["0.normal"] == x))
 
     test_dataloader = DataLoader(batch_size=1,
                                  dataset=LimitedDataset(dataset=test_dataset,
