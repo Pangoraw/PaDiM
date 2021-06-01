@@ -6,7 +6,6 @@ from numpy import ndarray as NDArray
 import torch
 from torch import Tensor, device as Device
 from torch.utils.data import DataLoader
-from scipy.spatial.distance import mahalanobis
 
 from padim.base import PaDiMBase
 from padim.utils.distance import mahalanobis_multi, mahalanobis_sq
