@@ -11,6 +11,7 @@ from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 def test(cfg, padim):
     LIMIT = cfg.test_limit
     TEST_FOLDER = cfg.test_folder
+    size = tuple(map(int, cfg.size.split("x")))
 
     predict_args = {}
     if cfg.compare_all:
@@ -18,7 +19,7 @@ def test(cfg, padim):
 
     img_transforms = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((416, 416)),
+        transforms.Resize(size),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])

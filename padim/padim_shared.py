@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 
 import torch
 from torch import Tensor, device as Device
@@ -19,8 +19,9 @@ class PaDiMShared(PaDiMBase):
         num_embeddings: int = 100,
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
+        size: Union[None, Tuple[int, int]] = None,
     ):
-        super(PaDiMShared, self).__init__(num_embeddings, device, backbone)
+        super(PaDiMShared, self).__init__(num_embeddings, device, backbone, size)
         self.N = 0
         self.mean = torch.zeros((self.num_embeddings, ), device=self.device)
         self.cov = torch.zeros((self.num_embeddings, self.num_embeddings),

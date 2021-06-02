@@ -1,6 +1,7 @@
 import os
 import pickle
 
+import torch
 from tqdm import tqdm
 import pandas as pd
 from PIL import Image
@@ -40,16 +41,18 @@ def train(cfg):
     LIMIT = cfg.train_limit
     PARAMS_PATH = cfg.params_path
     SHARED = cfg.shared
+    size = tuple(map(int, cfg.size.split("x")))
 
     if SHARED:
         Model = PaDiMShared
     else:
         Model = PaDiM
 
-    padim = Model(device="cuda:0", backbone="wide_resnet50")
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    padim = Model(device=device, backbone="wide_resnet50", size=size)
     img_transforms = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Resize((416, 416)),
+        transforms.Resize(size),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225]

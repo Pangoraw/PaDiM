@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 
 import torch
 from torch import Tensor, device as Device
@@ -12,10 +12,14 @@ class PaDiMBase:
     """
 
     def __init__(self, num_embeddings: int, device: Union[str, Device],
-                 backbone: str):
+                 backbone: str, size=None):
         self.device = device
         self.num_embeddings = num_embeddings
-        self._init_backbone(backbone)
+
+        if size is not None:
+            self._init_backbone_with_size(backbone, size)
+        else:
+            self._init_backbone(backbone)
 
         self.embedding_ids = torch.randperm(
             self.max_embeddings_size)[:self.num_embeddings].to(self.device)
@@ -30,6 +34,14 @@ class PaDiMBase:
 
         return backbone
 
+    def _init_backbone_with_size(self, backbone: str, size: Tuple[int, int]) -> None:
+        self._init_backbone(backbone)
+        empty_batch = torch.zeros((1, 3) + size, device=self.device)
+        feature_1, _, _ = self.model(empty_batch)
+        _, _, w, h = feature_1.shape
+        self.num_patches = w * h
+        self.model.num_patches = w * h
+
     def _init_backbone(self, backbone: str) -> None:
         if backbone == "resnet18":
             self.model = ResNet18().to(self.device)
@@ -43,10 +55,6 @@ class PaDiMBase:
         self.max_embeddings_size = self.model.embeddings_size
 
     def _embed_batch(self, imgs: Tensor, with_grad: bool = False) -> Tensor:
-        if with_grad:
-            self.model.eval()
-        else:
-            self.model.train()
         with torch.set_grad_enabled(with_grad):
             feature_1, feature_2, feature_3 = self.model(imgs.to(self.device))
         embeddings = embeddings_concat(feature_1, feature_2)

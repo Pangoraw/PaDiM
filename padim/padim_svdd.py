@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 import logging
 
 import numpy as np
@@ -28,9 +28,10 @@ class PaDiMSVDD(PaDiMBase):
         num_embeddings: int = 100,
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
+        size: Union[None, Tuple[int, int]] = None,
         **kwargs,
     ):
-        super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone)
+        super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone, size)
         self._init_params(**kwargs)
 
         self.use_self_supervision = False

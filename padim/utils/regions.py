@@ -7,7 +7,6 @@ import numpy as np
 from numpy import ndarray as NDArray
 import torch
 
-
 # A box defined as (x1, y1, x2, y2)
 Region = Tuple[int, int, int, int]
 
@@ -28,11 +27,11 @@ def propose_regions_cv2(patches, threshold: float = 0.75, **kwargs):
     mask = (patches >= threshold).astype(np.int8)
 
     _, _, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=4)
+
     def stat_to_box(stat):
         x1, y1, w, h, _ = stat
         return (x1, y1, x1 + w, y1 + h, 1)
     boxes = map(stat_to_box, stats[1:])
-
     return filter_regions(boxes, **kwargs)
 
 
@@ -73,9 +72,9 @@ def propose_region(
     patches[py, px] = 0.0
 
     directions = [
-        (0,  1),  # right
+        (0, 1),  # right
         (0, -1),  # left
-        (1,  0),  # down
+        (1, 0),  # down
         (-1, 0),  # up
     ]
     if explore_diagonals:
@@ -115,11 +114,9 @@ def propose_region(
     return (min_x, min_y, max_x, max_y, patch_value)
 
 
-def propose_regions(
-    patches: NDArray,
-    threshold: float = 0.75,
-    **kwargs
-) -> List[Region]:
+def propose_regions(patches: NDArray,
+                    threshold: float = 0.75,
+                    **kwargs) -> List[Region]:
     """Proposes many regions
 
     >>> propose_regions(np.array([[1, 0, 1], [1, 0, 1], [0, 1, 0]]))
@@ -170,14 +167,13 @@ def filter_regions(
     def get_area(region) -> float:
         x1, y1, x2, y2 = region[:4]
         return abs(x1 - x2) * abs(y1 - y2)
+
     if use_nms:
         regions = non_maximum_suppression(regions, **kwargs)
     return list(filter(lambda r: get_area(r) >= min_area, regions))
 
 
-def _serialize_region(
-    region: Region
-) -> List[Tuple[int, int]]:
+def _serialize_region(region: Region) -> List[Tuple[int, int]]:
     """Lists the patches that are part of a region
 
     >>> _serialize_region((0, 0, 1, 2))
@@ -217,10 +213,8 @@ def IoU(r1: Region, r2: Region) -> float:
     return len(intersection) / len(union)
 
 
-def floating_IoU(
-        r1: Tuple[float, float, float, float],
-        r2: Tuple[float, float, float, float]
-) -> float:
+def floating_IoU(r1: Tuple[float, float, float, float],
+                 r2: Tuple[float, float, float, float]) -> float:
     """IoU for non-grid based boxes
 
     >>> floating_IoU((0, 0, 1, 1), (0, 0, 1, 2))
@@ -262,10 +256,7 @@ def cvt_xyxys_xywhs(box):
     return (x1, y1, x2 - x1, y2 - y1, s)
 
 
-def non_maximum_suppression(
-    boxes: List,
-    iou_threshold: float = 0.5
-) -> List:
+def non_maximum_suppression(boxes: List, iou_threshold: float = 0.5) -> List:
     """Filter boxes using non-maximum suppression
 
     >>> non_maximum_suppression([(0, 0, 1, 2, .2), (0, 0, 1, 1, .4)])
@@ -287,12 +278,10 @@ def non_maximum_suppression(
         box = boxes.pop()
         new_boxes.append(box)
         # remove boxes
-        boxes = list(filter(
-            lambda other_box: floating_IoU(
-                cvt_xyxys_xywhs(box),
-                cvt_xyxys_xywhs(other_box)) < iou_threshold,
-            boxes
-        ))
+        boxes = list(
+            filter(
+                lambda other_box: floating_IoU(cvt_xyxys_xywhs(
+                    box), cvt_xyxys_xywhs(other_box)) < iou_threshold, boxes))
 
     return new_boxes
 
@@ -300,3 +289,27 @@ def non_maximum_suppression(
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
+
+    import timeit
+
+    array = 0.5 + np.random.randn(104, 104)
+
+    def test_cv2():
+        n_array = np.copy(array)
+        propose_regions_cv2(n_array, treshold=0.5, min_area=1)
+
+    def test_orig():
+        n_array = np.copy(array)
+        propose_regions(n_array, treshold=0.5, min_area=1)
+
+    n_try = 100
+    print("starting cv2")
+    time_cv2 = timeit.timeit(test_cv2, number=n_try)
+    print("cv2 done, starting orig")
+    time_orig = timeit.timeit(test_orig, number=n_try)
+    print("orig done")
+
+    print(f"time_cv2 = {time_cv2:.5f}")
+    print(f"time_cv2 (unit) = {time_cv2 / n_try:.5f}")
+    print(f"time_orig = {time_orig:.5f}")
+    print(f"time_orig (unit) = {time_orig / n_try:.5f}")
