@@ -12,14 +12,14 @@ class PaDiMBase:
     """
 
     def __init__(self, num_embeddings: int, device: Union[str, Device],
-                 backbone: str, size=None):
+                 backbone: str, size=None, load_path: str = None):
         self.device = device
         self.num_embeddings = num_embeddings
 
         if size is not None:
-            self._init_backbone_with_size(backbone, size)
+            self._init_backbone_with_size(backbone, size, load_path)
         else:
-            self._init_backbone(backbone)
+            self._init_backbone(backbone, load_path)
 
         self.embedding_ids = torch.randperm(
             self.max_embeddings_size)[:self.num_embeddings].to(self.device)
@@ -36,17 +36,17 @@ class PaDiMBase:
 
         return backbone
 
-    def _init_backbone_with_size(self, backbone: str, size: Tuple[int, int]) -> None:
-        self._init_backbone(backbone)
+    def _init_backbone_with_size(self, backbone: str, size: Tuple[int, int], load_path: str = None) -> None:
+        self._init_backbone(backbone, load_path)
         empty_batch = torch.zeros((1, 3) + size, device=self.device)
         feature_1, _, _ = self.model(empty_batch)
         _, _, w, h = feature_1.shape
         self.num_patches = w * h
         self.model.num_patches = w * h
 
-    def _init_backbone(self, backbone: str) -> None:
+    def _init_backbone(self, backbone: str, load_path: str = None) -> None:
         if backbone == "resnet18":
-            self.model = ResNet18().to(self.device)
+            self.model = ResNet18(load_path).to(self.device)
         elif backbone == "resnet50":
             self.model = ResNet50().to(self.device)
         elif backbone == "wide_resnet50":

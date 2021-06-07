@@ -5,9 +5,16 @@ from torchvision.models import resnet18, resnet50, wide_resnet50_2
 
 
 class EncoderBase(nn.Module):
-    def __init__(self, resnet_builder) -> None:
+    def __init__(self, resnet_builder, load_path=None) -> None:
         super().__init__()
-        self.resnet = resnet_builder(pretrained=True)
+        if load_path is None:
+            self.resnet = resnet_builder(pretrained=True)
+        else:
+            state_dict = torch.load(load_path)
+            convert = lambda k: k.replace("encoder.resnet.", "")
+            self.resnet = resnet_builder()
+            self.resnet.load_state_dict(state_dict)
+
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the three intermediary layers from the ResNet

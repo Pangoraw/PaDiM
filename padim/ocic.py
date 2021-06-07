@@ -11,28 +11,38 @@ class OCICBase:
   One Class Image Classifier based on a pre-trained ResNet model
   """
 
-  def __init__(self, device):
+  def __init__(self, device, mode="deep"):
     self.device = device
     self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
     self.backbone = resnet18(pretrained=True).to(device).eval()
-    self.feature_size = 448
+    self.mode = mode
+    if self.mode == "deep":
+        self.feature_size = 512
+    else:
+        self.feature_size = 448
 
   def _embed(self, x: Tensor, with_grad: bool = False) -> Tensor:
     with torch.set_grad_enabled(with_grad):
-      x = self.backbone.conv1(x)
-      x = self.backbone.bn1(x)
-      x = self.backbone.relu(x)
-      x = self.backbone.maxpool(x)
+      if self.mode == "deep":
+        for name, module in self.backbone._modules.items():
+          x = module(x)
+          if "avgpool" in name:
+            return torch.flatten(x, 1) 
+      else:
+        x = self.backbone.conv1(x)
+        x = self.backbone.bn1(x)
+        x = self.backbone.relu(x)
+        x = self.backbone.maxpool(x)
 
-      feature_1 = self.backbone.layer1(x)
-      feature_2 = self.backbone.layer2(feature_1)
-      feature_3 = self.backbone.layer3(feature_2)
+        feature_1 = self.backbone.layer1(x)
+        feature_2 = self.backbone.layer2(feature_1)
+        feature_3 = self.backbone.layer3(feature_2)
 
-      feature_1 = self.avgpool(feature_1).squeeze(2).squeeze(2)
-      feature_2 = self.avgpool(feature_2).squeeze(2).squeeze(2)
-      feature_3 = self.avgpool(feature_3).squeeze(2).squeeze(2)
+        feature_1 = self.avgpool(feature_1).squeeze(2).squeeze(2)
+        feature_2 = self.avgpool(feature_2).squeeze(2).squeeze(2)
+        feature_3 = self.avgpool(feature_3).squeeze(2).squeeze(2)
 
-      return torch.cat((feature_1, feature_2, feature_3), dim=1)
+        return torch.cat((feature_1, feature_2, feature_3), dim=1)
 
   @staticmethod
   def from_residuals(method, *args):
@@ -41,13 +51,14 @@ class OCICBase:
 
 
 class OCIC(OCICBase):
-  def __init__(self, device):
-    super(OCIC, self).__init__(device)
+  def __init__(self, device, mode=None):
+    super(OCIC, self).__init__(device, mode)
     self.mean = torch.zeros((self.feature_size,), device=device)
     self.cov_sum = torch.zeros((self.feature_size, self.feature_size), device=device)
     self.N = 0
 
   def train_one_batch(self, batch: Tensor):
+    batch = batch.to(self.device)
     embeddings = self._embed(batch)  # n * 512
     b = embeddings.size(0)
     for i in range(b):
@@ -56,8 +67,8 @@ class OCIC(OCICBase):
     self.N += b
 
   def train(self, dataloader):
-    for batch in tqdm(dataloader):
-      self.train_one_batch(batch)
+    for imgs, _ in tqdm(dataloader):
+      self.train_one_batch(imgs)
 
   def get_params(self, epsilon: float = .01):
     means = self.mean.detach().clone()
@@ -83,7 +94,8 @@ class OCIC(OCICBase):
 
   @staticmethod
   def _from_residuals(mean, cov_sum, N, device):
-    ocic = OCIC(device)
+    mode = "deep" if mean.shape[0] == 512 else "shallow"
+    ocic = OCIC(device, mode)
     ocic.mean = torch.tensor(mean, device=device)
     ocic.cov_sum = torch.tensor(cov_sum, device=device)
     ocic.N = N
@@ -103,8 +115,8 @@ class OCIC(OCICBase):
 
 class OCICSVDD(OCICBase):
 
-  def __init__(self, device):
-    super(OCICSVDD, self).__init__(device)
+  def __init__(self, device, mode=None):
+    super(OCICSVDD, self).__init__(device, mode)
 
   def train(self, dataloader, n_epochs):
     self.c = self._init_center()
@@ -136,7 +148,8 @@ class OCICSVDD(OCICBase):
 
   @staticmethod
   def _from_residuals(center, state_dict, device="cpu"):
-    ocic = OCICSVDD(device)
+    mode = "deep" if center.shape[0] == 512 else "shallow"
+    ocic = OCICSVDD(device, mode)
     ocic.backbone.load_state_dict(state_dict)
     ocic.backbone = ocic.backbone.eval().to(device)
     ocic.c = torch.tensor(center, device=device)
@@ -147,4 +160,4 @@ class OCICSVDD(OCICBase):
     return torch.sum((outputs - self.c)**2, dim=1)  
 
   def _init_center(self):
-    return 20 * torch.ones((self.rep_dim,), device=self.device)
+    return 20 * torch.ones((self.feature_size,), device=self.device)

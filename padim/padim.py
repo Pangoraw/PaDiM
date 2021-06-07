@@ -22,8 +22,9 @@ class PaDiM(PaDiMBase):
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
         size: Union[None, Tuple[int, int]] = None,
+        load_path: str = None,
     ):
-        super(PaDiM, self).__init__(num_embeddings, device, backbone, size)
+        super(PaDiM, self).__init__(num_embeddings, device, backbone, size, load_path)
         self.N = 0
         self.means = torch.zeros(
             (self.num_patches, self.num_embeddings)).to(self.device)
@@ -41,6 +42,7 @@ class PaDiM(PaDiMBase):
             # b * c * w * h
             embeddings = self._embed_batch(imgs.to(self.device))
             b = embeddings.size(0)
+            print(embeddings.shape)
             embeddings = embeddings.reshape(
                 (-1, self.num_embeddings, self.num_patches))  # b * c * (w * h)
             for i in range(self.num_patches):

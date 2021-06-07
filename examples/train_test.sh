@@ -1,21 +1,11 @@
 #!/bin/bash
 
-#SBATCH --gres=gpu:1
-#SBATCH -c 6
-#SBATCH --mail-type=FAIL,END
-
 if [[ ! -z ${SLURM_JOBID+z} ]];
 then
-	echo "Setting up SLURM env"
-	setcuda 10.2
-	conda activate python37
+	echo "Starting SLURM job $SLURM_JOBID"
 else
 	echo "Not a SLURM job"
 fi
-
-set -o errexit
-set -o pipefail
-set -o nounset
 
 CONFIG_FILE=${1-./configs/config.env}
 
@@ -38,6 +28,7 @@ python examples/main.py \
   --train_limit $TRAIN_LIMIT \
   --test_limit $TEST_LIMIT \
   --params_path $PARAMS_PATH \
+  --load_path $LOAD_PATH \
   --oe_folder ./data/coco/ \
   --oe_frequency ${OE_FREQUENCY-2} \
   --n_epochs ${N_EPOCHS-0} \

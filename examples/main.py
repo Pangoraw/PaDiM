@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument("--test_folder", required=True, type=str)
     parser.add_argument("--params_path", required=True, type=str)
     parser.add_argument("--train_limit", type=int, default=-1)
+    parser.add_argument("--load_path")
 
     # Testing params
     parser.add_argument("--test_limit", type=int, default=-1)

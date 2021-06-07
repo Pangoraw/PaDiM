@@ -49,7 +49,7 @@ def train(cfg):
         Model = PaDiM
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    padim = Model(device=device, backbone="wide_resnet50", size=size)
+    padim = Model(device=device, backbone="resnet18", size=size, load_path=cfg.load_path)
     img_transforms = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize(size),
