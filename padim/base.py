@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, device as Device
 
 from padim.utils import embeddings_concat
-from padim.backbones import ResNet18, WideResNet50
+from padim.backbones import ResNet18, ResNet50, WideResNet50
 
 
 class PaDiMBase:
@@ -27,6 +27,8 @@ class PaDiMBase:
     def _get_backbone(self):
         if isinstance(self.model, ResNet18):
             backbone = "resnet18"
+        if isinstance(self.model, ResNet50):
+            backbone = "resnet50"
         elif isinstance(self.model, WideResNet50):
             backbone = "wide_resnet50"
         else:
@@ -45,11 +47,13 @@ class PaDiMBase:
     def _init_backbone(self, backbone: str) -> None:
         if backbone == "resnet18":
             self.model = ResNet18().to(self.device)
+        elif backbone == "resnet50":
+            self.model = ResNet50().to(self.device)
         elif backbone == "wide_resnet50":
             self.model = WideResNet50().to(self.device)
         else:
             raise Exception(f"unknown backbone {backbone}, "
-                            "choose one of ['resnet18', 'wide_resnet50']")
+                            "choose one of ['resnet18', 'resnet50', 'wide_resnet50']")
 
         self.num_patches = self.model.num_patches
         self.max_embeddings_size = self.model.embeddings_size
