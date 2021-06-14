@@ -16,13 +16,13 @@ The key features of this implementation are:
 
 This repository also contains variants on the original PaDiM model:
 
-- [PaDiMSDDD](https://github.com/Pangoraw/PaDiM/blob/main/padim/padim_svdd.py) uses a [Deep-SVDD](http://proceedings.mlr.press/v80/ruff18a.html) model instead of a multi-variate Gaussian distribution for the normal patch representation.
+- [PaDiMSVDD](https://github.com/Pangoraw/PaDiM/blob/main/padim/padim_svdd.py) uses a [Deep-SVDD](http://proceedings.mlr.press/v80/ruff18a.html) model instead of a multi-variate Gaussian distribution for the normal patch representation.
 - [PaDiMShared](https://github.com/Pangoraw/PaDiM/blob/main/padim/padim_shared.py) shares the multi-variate Gaussian distribution between all patches instead of learning it only for specific coordinates.
 
 ### Installation
 
 ```
-git clone https://github.com/Pangoraw/PaDiM.git
+git clone https://github.com/Pangoraw/PaDiM.git padim
 ```
 
 ### Getting started
