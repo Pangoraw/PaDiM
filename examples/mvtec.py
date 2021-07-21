@@ -4,31 +4,29 @@ from pathlib import Path
 from typing_extensions import Literal
 from typing import Union, List, Tuple
 
-import cv2
 from PIL import Image
-import pandas as pd
 import numpy as np
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 
 import torch
 from torch import Tensor
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import Compose, ToTensor, Resize
+from torchvision.datasets import ImageFolder
+from sklearn.metrics import roc_auc_score
 
 sys.path.append("./")
 
 from padim import PaDiM
+from padim.panf import PaDiMNVP
 from padim.utils import mean_smoothing, compute_roc_score, compute_pro_score
 
 
-model = PaDiM(
+model = PaDiMNVP(
     num_embeddings=120,
     device="cpu",
     backbone="resnet18",
 )
-
 
 class MVTecDataset(Dataset):
     def __init__(
@@ -115,31 +113,35 @@ class MVTecTestDataset(Dataset):
 
 dataloader = DataLoader(
   batch_size=30,
-  dataset=MVTecDataset(
-    query_list="toothbrush",
-    data_dir="./data/toothbrush",
-    mode="train",
-    transforms=Compose([
+  dataset=ImageFolder(
+    root="./data/carpet/train/",
+    transform=Compose([
       ToTensor(),
-      Resize((128, 128)),
+      Resize((256, 256)),
     ]),
-    debug=False
 ))
-for imgs in tqdm(dataloader):
-    model.train_one_batch(imgs)
+
+
+if hasattr(model, "train_one_batch"):
+    for imgs in tqdm(dataloader):
+        model.train_one_batch(imgs)
+else:
+    model.train(dataloader, n_epochs=2)
+
 
 transforms = Compose([
   ToTensor(),
-  Resize((128, 128)),
+  Resize((256, 256)),
 ])
-test_dataloader = DataLoader(dataset=MVTecTestDataset(
-  good_data_dir="./data/toothbrush/test/good/",
-  defective_data_dir="./data/toothbrush/test/defective/",
-  transforms=transforms,
-))
+test_dataset = ImageFolder(
+  root="./data/carpet/test/",
+  transform=transforms,
+  target_transform=lambda x: int(test_dataset.class_to_idx["good"] != x),
+)
+test_dataloader = DataLoader(dataset=test_dataset)
 distances = []
 y_trues = []
-for labels, new_imgs in test_dataloader:
+for new_imgs, labels in test_dataloader:
     distances.extend(model.predict(new_imgs))
     y_trues.extend(labels)
 amaps = torch.tensor(np.array(distances), dtype=torch.float32)
@@ -169,7 +171,8 @@ amaps = mean_smoothing(amaps)
 amaps = (amaps - amaps.min()) / (amaps.max() - amaps.min())
 amaps = amaps.squeeze().numpy()
 
-roc_score = compute_roc_score(amaps, y_trues, test_dataloader.dataset.good_samples + test_dataloader.dataset.defective_samples)
+
+roc_score = roc_auc_score(amaps, y_trues)
 # pro_score = compute_pro_score(amaps, y_trues)
 
 print("roc score: ", roc_score)
