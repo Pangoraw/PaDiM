@@ -1,0 +1,3 @@
+[submodule "padim/normalizing_flows"]
+	path = padim/normalizing_flows
+	url = https://github.com/pangoraw/normalizing_flows.git
