@@ -15,9 +15,12 @@ def batch_mahalanobis_sq(x: Tensor, mu: Tensor, sigma_inv: Tensor) -> Tensor:
     =======
         dist: Distance tensor of size (b, h * w, 1)
     """
-    result = mahalanobis_sq(x, mu, sigma_inv)
-    return torch.diagonal(result, dim1=1,
-                          dim2=2).squeeze(1).unsqueeze(-1)  # (b, h * w, 1)
+    delta = x - mu
+
+    tmp1 = torch.einsum("bwc,wck->bwk", delta, sigma_inv)
+    dists = torch.einsum("bwk,bwc->bw", tmp1, delta)
+
+    return dists.unsqueeze(-1)  # (b, h * w, 1)
 
 
 def mahalanobis_sq(x: Tensor, mu: Tensor, sigma_inv: Tensor) -> Tensor:
@@ -30,7 +33,7 @@ def mahalanobis_sq(x: Tensor, mu: Tensor, sigma_inv: Tensor) -> Tensor:
         sigma_inv: The inverted covariance matrices of size (h * w, c, c)
     Returns
     =======
-        dist: Distance tensor of size (h * w, 1)
+        dist: Distance tensor of size (b, h * w, 1)
     """
     delta = x - mu  # (h * w, c)
     temp = torch.matmul(sigma_inv, delta.unsqueeze(-1))  # (h * w, c, 1)

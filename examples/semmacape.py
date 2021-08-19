@@ -10,13 +10,34 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data import DataLoader, Dataset
 
 from padim import PaDiM, PaDiMShared
-from padim.datasets import LimitedDataset
+from padim.datasets import (
+    LimitedDataset,
+    IfremerTrainingDataset,
+    SemmacapeDataset,
+    KelomniaTrainingDataset,
+)
+
+
+class IfremerDataset(Dataset):
+    def __init__(self, data_dir, img_transforms):
+        self.data_dir = data_dir
+        self.transforms = img_transforms
+        self.files = os.listdir(self.data_dir)
+
+    def __getitem__(self, index):
+        location = self.data_dir + self.files[index]
+        img = Image.open(location)
+        img = self.transforms(img)
+        return img, 1
+
+    def __len__(self):
+        return len(self.files)
 
 
 class TrainingDataset(Dataset):
-    def __init__(self, data_dir, img_transforms):
+    def __init__(self, data_dir, img_transforms, ranking_file="./empty_ranking.csv"):
         self.data_dir = data_dir
-        self.data_frame = pd.read_csv("./empty_ranking.csv", index_col=0)
+        self.data_frame = pd.read_csv(ranking_file, index_col=0)
         self.transforms = img_transforms
 
     def __getitem__(self, index):
@@ -26,7 +47,8 @@ class TrainingDataset(Dataset):
             direction = 1
         index = direction * index // 2
 
-        img_path = self.data_dir + self.data_frame.iloc[index][0]
+        file_name = self.data_frame.iloc[index][0]
+        img_path = file_name if file_name.startswith("/") else self.data_dir + file_name
         img = Image.open(img_path)
         img = self.transforms(img)
 
@@ -49,7 +71,11 @@ def train(cfg):
         Model = PaDiM
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    padim = Model(device=device, backbone="resnet18", size=size, load_path=cfg.load_path)
+    padim = Model(
+            device=device,
+            backbone=cfg.backbone,
+            size=size, load_path=cfg.load_path,
+            mode="random" if not cfg.semi_ortho else "semi_orthogonal")
     img_transforms = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize(size),
@@ -58,7 +84,37 @@ def train(cfg):
             std=[0.229, 0.224, 0.225]
         ),
     ])
-    if "semmacape" in cfg.train_folder:
+    if "seals" in cfg.train_folder:
+        # training_dataset = IfremerTrainingDataset(
+        #     transform=img_transforms,
+        #     homo_dir=cfg.train_folder + "416_homogeneous/",
+        #     hetero_dir=cfg.train_folder + "416_non_homogeneous/",
+        #     homo_frequency=cfg.homo_frequency,
+        # )
+        training_dataset = TrainingDataset(
+            data_dir=cfg.train_folder,
+            img_transforms=img_transforms,
+            ranking_file="./seal_empty_ranking.csv",
+        )
+        print(f"Dataset with {len(training_dataset)} samples")
+    elif "turtles" in cfg.train_folder.lower():
+        # training_dataset = SemmacapeDataset(
+        #     transforms=img_transforms,
+        #     data_dir=cfg.train_folder,
+        # )
+        training_dataset = TrainingDataset(
+            data_dir=cfg.train_folder,
+            img_transforms=img_transforms,
+            ranking_file="./turtles_empty_ranking.csv",
+        )
+    elif "ifremer" in cfg.train_folder.lower():
+        training_dataset = TrainingDataset(
+            data_dir=cfg.train_folder,
+            img_transforms=img_transforms,
+            ranking_file="./ifremer_empty_ranking.csv",
+        )
+        print(f"Dataset with {len(training_dataset)} samples")
+    elif "semmacape" in cfg.train_folder:
         training_dataset = TrainingDataset(
             data_dir=cfg.train_folder,
             img_transforms=img_transforms,

@@ -1,14 +1,19 @@
+from os import path
 import pickle
 
 from tqdm import tqdm
 import torch
+import torch.nn.functional as F
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_auc_score
+from PIL import Image, ImageDraw
+import matplotlib.pyplot as plt
 
 from padim.datasets import (
     LimitedDataset,
     SemmacapeTestDataset,
+    KelomniaTestingDataset,
 )
 from padim.utils import propose_regions_cv2 as propose_regions, floating_IoU
 from padim import OCIC
@@ -34,7 +39,18 @@ accepted_classes = {
     "Fou_Bassan_Vol": 1,
 }
 
-def test(cfg, padim, t):
+def annotate_image(img, gt_boxes, pred_boxes):
+    draw = ImageDraw.Draw(img)
+
+    for pred in pred_boxes:
+        draw.rectangle(pred, outline='red', width=3)
+
+    for box in gt_boxes:
+        draw.rectangle(box, outline='green', width=3)
+
+    return img
+
+def test(cfg, padim, t, has_already_computed_auroc=False):
     LIMIT = cfg.test_limit
     THRESHOLD = t
     IOU_THRESHOLD = cfg.iou_threshold
@@ -58,10 +74,17 @@ def test(cfg, padim, t):
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225]),
     ])
-    test_dataset = SemmacapeTestDataset(
-        data_dir=TEST_FOLDER,
-        transforms=img_transforms,
-    )
+
+    if "turtles" in TEST_FOLDER.lower():
+        test_dataset = KelomniaTestingDataset(
+            transform=img_transforms,
+        )
+    else:
+        test_dataset = SemmacapeTestDataset(
+            data_dir=TEST_FOLDER,
+            transforms=img_transforms,
+        )
+
     test_dataloader = DataLoader(batch_size=1,
                                  dataset=LimitedDataset(dataset=test_dataset,
                                                         limit=LIMIT))
@@ -78,13 +101,24 @@ def test(cfg, padim, t):
     y_trues = []
     y_preds = []
 
-    means, covs, _ = padim.get_params()
-    inv_cvars = padim._get_inv_cvars(covs)
+    means, covs = padim.get_params()[:2]
+
+    inv_cvars = torch.inverse(covs)
+    if hasattr(padim, "finalize_training"):
+        padim.finalize_training()
+
     pbar = tqdm(test_dataloader)
     for loc, img, _, y_true in pbar:
+        
+        # we want only one rocauc
+        if has_already_computed_auroc and y_true[0] == 1:
+            continue
+
         # 1. Prediction
         res = padim.predict(img, params=(means, inv_cvars), **predict_args)
         preds = [res.max().item()]
+        # if hasattr(padim, 'net'):
+        #     res = (1+res).log()
         res = (res - res.min()) / (res.max() - res.min())
         res = res.reshape((LATTICE, LATTICE)).cpu()
 
@@ -120,12 +154,20 @@ def test(cfg, padim, t):
         img_proposals_counted = False
 
         # 2. Collect GT boxes
-        with open(loc[0].replace('.jpg', '_with_name_label.txt'), 'r') as f:
+        _, ext = path.splitext(loc[0])
+        label_location = loc[0].replace(ext, '_with_name_label.txt')
+        label_location = loc[0].replace(ext, '.txt') if not path.exists(label_location) else label_location
+        with open(label_location, 'r') as f:
             lines = f.readlines()
+
+        img_proposed = len(preds)
+        img_boxes = len(lines)
+        img_detected = 0
+        boxes = []
 
         n_gt += len(lines)
         for line in lines:
-            cls, cx, cy, bw, bh, _ = line.split(' ')
+            cls, cx, cy, bw, bh = line.split(" ")[:5]
             if cls not in classes:
                 # classes[cls] =
                 # (# detected, # proposals, sum(iou), total number of GT)
@@ -147,9 +189,11 @@ def test(cfg, padim, t):
             x1, y1 = float(cx) - float(bw) / 2, float(cy) - float(bh) / 2
             w, h = float(bw), float(bh)
             box = (x1, y1, w, h)
+            boxes.append(box)
 
             box_detected = False
-            for pred in preds:
+            preds_to_remove = set()
+            for i, pred in enumerate(preds):
                 iou = floating_IoU(box, pred)
                 sum_iou += iou
                 classes[cls] = (
@@ -162,6 +206,8 @@ def test(cfg, padim, t):
                 if not box_detected and iou >= IOU_THRESHOLD:
                     # Positive detection
                     # Count detected box only once
+                    preds_to_remove.add(i)
+                    img_detected += 1
                     positive_proposals += 1
                     classes[cls] = (classes[cls][0] + 1, classes[cls][1],
                                     classes[cls][2], classes[cls][3])
@@ -171,6 +217,9 @@ def test(cfg, padim, t):
                 if (x2 >= x1 and x2 + w2 <= x1 + w and y2 >= y1
                         and y2 + h2 <= y1 + h):
                     n_included += 1
+            for p in preds_to_remove:
+                # count only once
+                del preds[p]
 
         if n_proposals == 0:
             PPR = 0
@@ -179,13 +228,42 @@ def test(cfg, padim, t):
         recall = positive_proposals / n_gt
         pbar.set_description(f"PPR: {PPR:.3f} RECALL: {recall:.3f}")
 
+        # img_ppr = img_detected / img_proposed if img_proposed != 0 else 0
+        # img_recall = img_detected / img_boxes if img_boxes != 0 else 0
+        # print(f"%% {loc[0]} ppr={img_ppr:.4f} recall={img_recall:.4f}")
+
+        if False:
+            factor = 416
+            unnormalize = lambda box: tuple(map(lambda x: x * factor, box))
+            def to_xyxy(box):
+                x,y,w,h = box[:4]
+                return x, y, x+w, y+h
+
+            preds = [to_xyxy(unnormalize(pred)) for pred in preds]
+            boxes = [to_xyxy(unnormalize(box)) for box in boxes]
+            img = Image.open(loc[0])
+            img_to_save = annotate_image(img, boxes, preds)
+
+            fig, axs = plt.subplots(ncols=2, sharey=True, figsize=(8,4))
+            axs[0].imshow(img_to_save)
+            axs[1].imshow(F.interpolate(res.unsqueeze(0).unsqueeze(0), (factor, factor)).squeeze())
+
+            pred_folder = "deep_ifremer" if "ifremer" in cfg.test_folder.lower() else "turtles"
+
+            path_to_save = path.join(f"{pred_folder}_predictions", path.basename(loc[0]))
+            # img_to_save.save(path_to_save)
+            plt.savefig(path_to_save)
+            plt.show()
+            plt.close(fig)
+
     results = {}
 
     # from 1 normal to 1 anomalous
-    y_trues = list(map(lambda x: 1.0 - x, y_trues))
-    roc_score = roc_auc_score(y_trues, y_preds)
-    print(f"roc auc score: {roc_score}")
-    results["roc_auc_score"] = roc_score
+    if len(set(y_trues)) == 2:
+        y_trues = list(map(lambda x: 1.0 - x, y_trues))
+        roc_score = roc_auc_score(y_trues, y_preds)
+        print(f"roc auc score: {roc_score}")
+        results["roc_auc_score"] = roc_score
 
     print(f"positive proposals: {positive_proposals}")
     print(f"total positive proposals: {total_positive_proposals}")
@@ -214,12 +292,13 @@ def test(cfg, padim, t):
     results['f1_score'] = f1
     print(f"F1_SCORE: {f1}")
 
-    grouped_classes = {cls: (0, 0, 0, 0) for cls in grouped_classes_labels}
-    for cls, data in classes.items():
-        acc = grouped_classes[grouped_classes_labels[accepted_classes[cls]]]
-        grouped_classes[grouped_classes_labels[accepted_classes[cls]]] = tuple(map(sum, zip(data, acc)))
+    if "Dauphin_BleuBlanc" in classes.keys():
+        grouped_classes = {cls: (0, 0, 0, 0) for cls in grouped_classes_labels}
+        for cls, data in classes.items():
+            acc = grouped_classes[grouped_classes_labels[accepted_classes[cls]]]
+            grouped_classes[grouped_classes_labels[accepted_classes[cls]]] = tuple(map(sum, zip(data, acc)))
 
-    classes.update(grouped_classes)
+        classes.update(grouped_classes)
 
     for cls, (detected, n_cls_proposals, cls_sum_iou,
               n_cls_gt) in classes.items():

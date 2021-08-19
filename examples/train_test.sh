@@ -28,7 +28,6 @@ python examples/main.py \
   --train_limit $TRAIN_LIMIT \
   --test_limit $TEST_LIMIT \
   --params_path $PARAMS_PATH \
-  --load_path $LOAD_PATH \
   --oe_folder ./data/coco/ \
   --oe_frequency ${OE_FREQUENCY-2} \
   --n_epochs ${N_EPOCHS-0} \

@@ -75,7 +75,7 @@ class SemmacapeTestDataset(Dataset):
         self.data_dir = data_dir
         self.transforms = transforms
         self.image_files = [
-            f for f in os.listdir(data_dir) if f.endswith(".jpg")
+            f for f in os.listdir(data_dir) if f.endswith(".jpg") or f.endswith(".png")
         ]
 
     def __getitem__(self, index):
@@ -90,10 +90,15 @@ class SemmacapeTestDataset(Dataset):
         is_image_normal = "normal" in img_location
 
         if not is_image_normal:
-            with open(img_location.replace(".jpg", ".txt")) as f:
+            _, ext = os.path.splitext(img_location)
+            label_file = img_location.replace(ext, "_with_name_label.txt") 
+            label_file = img_location.replace(ext, ".txt") if not os.path.exists(label_file) else label_file
+            with open(label_file, "r") as f:
+                lines = [l.strip().split(" ") for l in f.readlines()]
                 boxes = [
-                    [float(x) for x in l.split(" ")[1:-1]]
-                    for l in f.readlines()
+                    [float(x) for x in (l + ["1"] * (6 - len(l)))[1:-1]]
+                    for l in lines
+                    if len(l) != 0 
                 ]
             for cx, cy, bw, bh in boxes:
                 x1, y1 = int((cx - bw / 2) * w), int((cy - bh / 2) * h)
@@ -118,7 +123,7 @@ class SemmacapeDataset(Dataset):
         self.transforms = transforms
 
         self.image_files = [
-            f for f in os.listdir(data_dir) if f.endswith(".jpg")
+            f for f in os.listdir(data_dir) if f.endswith(".jpg") or f.endswith(".png")
         ]
 
     def __getitem__(self, index: int) -> Tensor:
@@ -126,7 +131,7 @@ class SemmacapeDataset(Dataset):
         img = Image.open(path.join(self.data_dir, file_path))
         img = self.transforms(img)
 
-        return img
+        return img, 1
 
     def __len__(self) -> int:
         return len(self.image_files)

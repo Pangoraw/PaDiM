@@ -23,8 +23,9 @@ class PaDiM(PaDiMBase):
         backbone: str = "resnet18",
         size: Union[None, Tuple[int, int]] = None,
         load_path: str = None,
+        mode: str = None,
     ):
-        super(PaDiM, self).__init__(num_embeddings, device, backbone, size, load_path)
+        super(PaDiM, self).__init__(num_embeddings, device, backbone, size, load_path, mode=mode)
         self.N = 0
         self.means = torch.zeros(
             (self.num_patches, self.num_embeddings)).to(self.device)
@@ -42,16 +43,11 @@ class PaDiM(PaDiMBase):
             # b * c * w * h
             embeddings = self._embed_batch(imgs.to(self.device))
             b = embeddings.size(0)
-            print(embeddings.shape)
             embeddings = embeddings.reshape(
                 (-1, self.num_embeddings, self.num_patches))  # b * c * (w * h)
-            for i in range(self.num_patches):
-                patch_embeddings = embeddings[:, :, i]  # b * c
-                for j in range(b):
-                    self.covs[i, :, :] += torch.outer(
-                        patch_embeddings[j, :],
-                        patch_embeddings[j, :])  # c * c
-                self.means[i, :] += patch_embeddings.sum(dim=0)  # c
+
+            self.covs += torch.einsum("biw,bjw->wij", embeddings, embeddings)
+            self.means += torch.einsum("biw->wi", embeddings)
             self.N += b  # number of images
 
     def train(self, dataloader: DataLoader) -> Tuple[Tensor, Tensor, Tensor]:
@@ -95,7 +91,7 @@ class PaDiM(PaDiMBase):
             covs[i, :, :] /= self.N - 1  # corrected covariance
             covs[i, :, :] += epsilon * identity  # constant term
 
-        return means, covs, self.embedding_ids
+        return means, covs, self.embedding_ids if self.embedding_mode == "random" else self.W
 
     def test(self, dataloader: DataLoader) -> List[NDArray]:
         """
@@ -163,10 +159,13 @@ class PaDiM(PaDiMBase):
             covs: Tensor - the sums of the outer product of embedding vectors
             embedding_ids: Tensor - random dimensions used for size reduction
         """
-        backbone = self._get_backbone()
-
         def detach_numpy(t: Tensor) -> NDArray:
             return t.detach().cpu().numpy()
+
+        backbone = self._get_backbone()
+        if self.embedding_mode == "semi_orthogonal":
+            return (self.N, detach_numpy(self.means), detach_numpy(self.covs),
+                detach_numpy(self.W), backbone)
 
         return (self.N, detach_numpy(self.means), detach_numpy(self.covs),
                 detach_numpy(self.embedding_ids), backbone)
@@ -175,11 +174,21 @@ class PaDiM(PaDiMBase):
     def from_residuals(N: int, means: NDArray, covs: NDArray,
                        embedding_ids: NDArray, backbone: str,
                        device: Union[Device, str]):
-        num_embeddings, = embedding_ids.shape
+        if len(embedding_ids.shape) == 2:
+            _, num_embeddings = embedding_ids.shape
+        else:
+            num_embeddings, = embedding_ids.shape
+
         padim = PaDiM(num_embeddings=num_embeddings,
                       device=device,
+                      mode="random" if len(embedding_ids.shape) == 1 else "semi_orthogonal",
                       backbone=backbone)
-        padim.embedding_ids = torch.tensor(embedding_ids).to(device)
+
+        if len(embedding_ids.shape) == 1:
+            padim.embedding_ids = torch.tensor(embedding_ids, device=device)
+        else:
+            padim.W = torch.tensor(embedding_ids, device=device)
+
         padim.N = N
         padim.means = torch.tensor(means).to(device)
         padim.covs = torch.tensor(covs).to(device)

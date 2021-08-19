@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import torch
 from torch import nn, Tensor
 from torchvision.models import resnet18, resnet50, wide_resnet50_2
 
@@ -13,8 +14,7 @@ class EncoderBase(nn.Module):
             state_dict = torch.load(load_path)
             convert = lambda k: k.replace("encoder.resnet.", "")
             self.resnet = resnet_builder()
-            self.resnet.load_state_dict(state_dict)
-
+            self.resnet.load_state_dict(state_dict, strict=False)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor, Tensor]:
         """Return the three intermediary layers from the ResNet
@@ -44,21 +44,21 @@ class ResNet50(EncoderBase):
     embeddings_size = 1792
     num_patches = 32 * 32
 
-    def __init__(self) -> None:
-        super(ResNet50, self).__init__(resnet50)
+    def __init__(self, load_path=None) -> None:
+        super(ResNet50, self).__init__(resnet50, load_path)
 
 
 class ResNet18(EncoderBase):
     embeddings_size = 448
     num_patches = 32 * 32
 
-    def __init__(self) -> None:
-        super(ResNet18, self).__init__(resnet18)
+    def __init__(self, load_path=None) -> None:
+        super(ResNet18, self).__init__(resnet18, load_path)
 
 
 class WideResNet50(EncoderBase):
     embeddings_size = 1792
     num_patches = 104 * 104
 
-    def __init__(self) -> None:
-        super(WideResNet50, self).__init__(wide_resnet50_2)
+    def __init__(self, load_path=None) -> None:
+        super(WideResNet50, self).__init__(wide_resnet50_2, load_path)

@@ -1,3 +1,4 @@
+from math import sqrt
 from typing import Union, Tuple
 import logging
 
@@ -29,9 +30,11 @@ class PaDiMSVDD(PaDiMBase):
         device: Union[str, Device] = "cpu",
         backbone: str = "resnet18",
         size: Union[None, Tuple[int, int]] = None,
+        load_path: str = None,
+        mode = "random",
         **kwargs,
     ):
-        super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone, size)
+        super(PaDiMSVDD, self).__init__(num_embeddings, device, backbone, size, load_path=load_path, mode=mode)
         self._init_params(**kwargs)
 
         self.use_self_supervision = False
@@ -211,7 +214,7 @@ class PaDiMSVDD(PaDiMBase):
                         torch.max(torch.zeros_like(scores), scores))
                 else:
                     if outlier_exposure:
-                        mask = torch.zeros((imgs.size(0), 104 * 104),
+                        mask = torch.zeros((imgs.size(0), self.num_patches),
                                            dtype=torch.bool,
                                            device=self.device)
                         mask[y_true == 1, :] = True
@@ -223,7 +226,7 @@ class PaDiMSVDD(PaDiMBase):
                     else:
                         loss = torch.mean(dist)
 
-                loss.backward(retain_graph=True)
+                loss.backward(retain_graph=self_supervision)
                 optimizer.step()
 
                 if self_supervision:
@@ -292,6 +295,7 @@ class PaDiMSVDD(PaDiMBase):
         return c
 
     def predict(self, batch: Tensor, params=None):
+        b = batch.size(0)
         self.net.eval()
 
         with torch.no_grad():
@@ -304,13 +308,14 @@ class PaDiMSVDD(PaDiMBase):
             scores = dists
 
         # Return anomaly maps
-        return scores.reshape((-1, 1, 104, 104))
+        W = int(sqrt(scores.size(0)))
+        return scores.reshape((b, 1, W, W))
 
     def get_params(self):
         """
         Returns placeholders for the mean and covariance
         """
-        return torch.zeros((1, )), torch.zeros((1, 1)), self.embedding_ids
+        return torch.zeros((1, )), torch.eye(2), self.embedding_ids if self.embedding_mode != "semi_orthogonal" else self.W
 
     def _get_inv_cvars(self, a):
         """
@@ -326,6 +331,9 @@ class PaDiMSVDD(PaDiMBase):
         net_dict = self.net.state_dict()
         objective = self.objective
         c, R = self.c, self.R
+        if self.embedding_mode == "semi_orthogonal":
+            return net_dict, objective, c, R, detach_numpy(
+                self.W), backbone
         if self.use_self_supervision:
             backbone_dict = self.model.state_dict()
             return net_dict, objective, c, R, detach_numpy(
@@ -342,20 +350,32 @@ class PaDiMSVDD(PaDiMBase):
                        backbone,
                        backbone_dict=None,
                        device="cuda"):
-        num_embeddings, = embedding_ids.shape
         n_svdds = 0
         for key in net_dict.keys():
             if key.startswith("svdds."):
                 n_svdds = max(n_svdds, int(key[6:].split(".")[0]))
         n_svdds += 1
+
+        if len(embedding_ids.shape) == 2:
+            _, num_embeddings = embedding_ids.shape
+        else:
+            num_embeddings, = embedding_ids.shape
+
         padim = PaDiMSVDD(num_embeddings=num_embeddings,
                           backbone=backbone,
                           device=device,
                           n_svdds=n_svdds,
-                          R=R)
+                          R=R, mode="random" if len(embedding_ids.shape) == 1 else "semi_orthogonal")
+
         padim.net.load_state_dict(net_dict)
         padim.net = padim.net.to(device)
-        padim.embedding_ids = torch.tensor(embedding_ids, device=device)
+        padim.net.eval()
+
+        if len(embedding_ids.shape) == 1:
+            padim.embedding_ids = torch.tensor(embedding_ids, device=device)
+        else:
+            padim.W = torch.tensor(embedding_ids, device=device)
+
         padim.R = R
         if isinstance(c, Tensor):
             padim.c = c.clone().to(device)
