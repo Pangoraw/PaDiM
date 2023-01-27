@@ -104,7 +104,7 @@ def main():
         else:
             model = train_padim(cfg)
 
-    if "semmacape" in cfg.test_folder:
+    if "semmacape" in cfg.test_folder.lower():
         if cfg.test_ious:
             i = 0
             print("testing iou/thresholds matrix")
